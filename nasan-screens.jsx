@@ -260,6 +260,13 @@ const STR = {
   ready: ['Ready', 'ئامادەیە', 'جاهز'],
   readyPickup: ['Ready for pickup', 'ئامادەیە بۆ وەرگرتن', 'جاهز للاستلام'],
   collected: ['Collected', 'وەرگیراوە', 'تم التسليم'],
+  cancelOrder: ['Cancel order', 'هەڵوەشاندنەوەی داواکاری', 'إلغاء الطلب'],
+  cancelSure: ['Cancel this order?', 'ئەم داواکارییە هەڵبوەشێنرێتەوە؟', 'هل تريد إلغاء هذا الطلب؟'],
+  cancelNote: ['This can’t be undone. You can order again anytime.', 'ناگەڕێتەوە. هەر کاتێک دەتوانیت دووبارە داوا بکەیت.', 'لا يمكن التراجع. يمكنك الطلب مجددًا في أي وقت.'],
+  keepOrder: ['Keep order', 'بیهێڵەوە', 'إبقاء الطلب'],
+  yesCancel: ['Yes, cancel', 'بەڵێ، هەڵیبوەشێنەوە', 'نعم، إلغاء'],
+  cancelled: ['Cancelled', 'هەڵوەشێنرایەوە', 'ملغى'],
+  cancelLocked: ['Ready orders can’t be cancelled here — message us.', 'داواکاریی ئامادە لێرە هەڵناوەشێتەوە — پەیاممان بۆ بنێرە.', 'لا يمكن إلغاء الطلب الجاهز هنا — راسلنا.'],
   askAboutOrder: ['Ask about this order', 'پرسیار لەسەر ئەم داواکارییە', 'اسأل عن هذا الطلب'],
   reorder: ['Reorder', 'دووبارە داوابکە', 'إعادة الطلب'],
   getInvoice: ['Get invoice', 'وەصڵ وەربگرە', 'الفاتورة'],
@@ -1086,6 +1093,7 @@ const SPLASH_CSS = `
 @keyframes nsSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes nsSheetDown{from{transform:translateY(0)}to{transform:translateY(100%)}}
 @keyframes nsSpin{to{transform:rotate(360deg)}}
+@keyframes nsCardOut{to{opacity:0;transform:translateX(-24px) scale(.97)}}
 @keyframes nsPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.86)}}
 @keyframes nsRiseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes nsPop{0%{transform:scale(.9)}60%{transform:scale(1.04)}100%{transform:scale(1)}}
@@ -2503,6 +2511,12 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
   const [tab, setTab] = React.useState('Active');
   const [open, setOpen] = React.useState(null);
   const [asked, setAsked] = React.useState(null);
+  const [confirmCancel, setConfirmCancel] = React.useState(null);
+  const [leaving, setLeaving] = React.useState(null);
+  const doCancel = (id) => {
+    setLeaving(id); setConfirmCancel(null); setAsked(null);
+    setTimeout(() => { window.NasanStore && window.NasanStore.setOrderStatus(id, 'Cancelled'); setLeaving(null); }, 320);
+  };
   const WA = 'https://wa.me/9647704149292?text=';
   const st = window.useNasanStore ? window.useNasanStore() : { orders: [] };
   const STEP = { Waiting: 0, Received: 1, Preparing: 2, Ready: 3, 'Picked up': 4, Collected: 4 };
@@ -2517,7 +2531,7 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
       localWhen(o.when, li),
       STEP[o.status] ?? 0, o.updatedAt]);
   const past = st.orders.filter(o => o.past)
-    .map(o => [o.id, o.summary.replace(/(\d+) items?$/, (m, n) => localItems(Number(n))), localWhen(o.when, li), o.shop || 'Barzar Jawazaka']);
+    .map(o => [o.id, o.summary.replace(/(\d+) items?$/, (m, n) => localItems(Number(n))), localWhen(o.when, li), o.shop || 'Barzar Jawazaka', o.status === 'Cancelled']);
   return (
     <D>
       <Screen bg={T.paper} bar={{ title: tr('orders', li), onMenu, onCart: () => onNav && onNav('Cart'), cart: cartCount, onLang }}>
@@ -2536,7 +2550,7 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
           {tab === 'Active' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 20px 26px' }}>
               {active.map(([id, status, items, when, step, updatedAt], oi) => (
-                <div key={id} style={{ padding: 16, borderRadius: 18, background: T.white, border: `1px solid ${T.line}`, animation: 'nsCardIn .32s cubic-bezier(.2,.8,.25,1) both', animationDelay: (oi * 0.06) + 's' }}>
+                <div key={id} style={{ padding: 16, borderRadius: 18, background: T.white, border: `1px solid ${T.line}`, animation: leaving === id ? 'nsCardOut .32s cubic-bezier(.5,0,.75,0) both' : 'nsCardIn .32s cubic-bezier(.2,.8,.25,1) both', animationDelay: leaving === id ? '0s' : (oi * 0.06) + 's' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ font: `700 15px/1 ${T.sans}`, color: T.ink }}>{id}</span>
                     <span key={status} style={{
@@ -2594,6 +2608,24 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
                       </a>
                     </div>
                   )}
+                  {step <= 2 ? (
+                    confirmCancel === id ? (
+                      <div style={{ marginTop: 10, padding: 14, borderRadius: 14, background: 'rgba(180,68,58,0.06)', border: '1px solid rgba(180,68,58,0.25)', animation: 'nsRiseIn .22s cubic-bezier(.2,.8,.25,1) both' }}>
+                        <div style={{ font: `700 14px/1.2 ${T.sans}`, color: T.ink }}>{tr('cancelSure', li)}</div>
+                        <div style={{ marginTop: 5, font: `400 12.5px/1.45 ${T.sans}`, color: T.ink70 }}>{tr('cancelNote', li)}</div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <div onClick={() => setConfirmCancel(null)} {...press(0.97)} style={{ ...pressStyle, flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 100, border: `1px solid ${T.line}`, background: T.white, font: `600 13px/1 ${T.sans}`, color: T.ink, cursor: 'pointer' }}>{tr('keepOrder', li)}</div>
+                          <div onClick={() => doCancel(id)} {...press(0.97)} style={{ ...pressStyle, flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 100, background: '#B4443A', font: `600 13px/1 ${T.sans}`, color: '#fff', cursor: 'pointer' }}>{tr('yesCancel', li)}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div onClick={() => { setConfirmCancel(id); setAsked(null); }} {...press(0.975)} style={{ ...pressStyle, marginTop: 8, textAlign: 'center', padding: '11px 0', font: `600 13px/1 ${T.sans}`, color: '#B4443A', cursor: 'pointer' }}>
+                        {tr('cancelOrder', li)}
+                      </div>
+                    )
+                  ) : (
+                    <div style={{ marginTop: 10, textAlign: 'center', font: `400 12px/1.4 ${T.sans}`, color: T.ink45 }}>{tr('cancelLocked', li)}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2601,7 +2633,7 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
 
           {tab === 'Past' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 20px 26px' }}>
-              {past.map(([id, items, when, shop]) => {
+              {past.map(([id, items, when, shop, isCancelled]) => {
                 const isOpen = open === id;
                 return (
                   <div key={id} onClick={() => setOpen(isOpen ? null : id)} style={{
@@ -2610,14 +2642,17 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ font: `700 14.5px/1.2 ${T.sans}`, color: T.ink }}>{id}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ font: `700 14.5px/1.2 ${T.sans}`, color: T.ink }}>{id}</span>
+                          {isCancelled && <span style={{ font: `600 10px/1 ${T.sans}`, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '5px 7px', borderRadius: 6, background: 'rgba(180,68,58,0.10)', color: '#B4443A' }}>{tr('cancelled', li)}</span>}
+                        </div>
                         <div style={{ marginTop: 4, font: `400 12.5px/1.3 ${T.sans}`, color: T.ink45 }}>{items} · {when}</div>
                       </div>
                       <svg data-flip="1" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.ink45} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .18s' }}><path d="M9 5l7 7-7 7" /></svg>
                     </div>
                     {isOpen && (
                       <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
-                        {[['Collected from', shop], ['Payment', 'Cash on pickup'], ['Status', 'Completed']].map(([k, v]) => (
+                        {(isCancelled ? [['Status', tr('cancelled', li)]] : [['Collected from', shop], ['Payment', 'Cash on pickup'], ['Status', 'Completed']]).map(([k, v]) => (
                           <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                             <span style={{ font: `400 13px/1.4 ${T.sans}`, color: T.ink45 }}>{k}</span>
                             <span style={{ font: `500 13px/1.4 ${T.sans}`, color: T.ink }}>{v}</span>

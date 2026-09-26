@@ -224,7 +224,7 @@ function NasanAdmin() {
                       <td style={td}>
                         <select value={o.status} onChange={e => window.NasanStore && window.NasanStore.setOrderStatus(o.id, e.target.value)}
                           style={{ height: 32, padding: '0 8px', borderRadius: 8, border: `1px solid ${A.line}`, background: A.white, font: `500 12.5px/1 ${A.sans}`, color: A.ink }}>
-                          {['Waiting', 'Received', 'Preparing', 'Ready', 'Picked up'].map(v => <option key={v}>{v}</option>)}
+                          {['Waiting', 'Received', 'Preparing', 'Ready', 'Picked up', 'Cancelled'].map(v => <option key={v}>{v}</option>)}
                         </select>
                       </td>
                     </tr>

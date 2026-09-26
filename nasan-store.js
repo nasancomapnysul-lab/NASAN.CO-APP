@@ -229,7 +229,7 @@ const NasanStore = {
     const o = store.orders.find(x => x.id === id);
     if (!o) return;
     o.status = status;
-    o.past = status === 'Picked up' || status === 'Collected';
+    o.past = status === 'Picked up' || status === 'Collected' || status === 'Cancelled';
     o.updatedAt = Date.now();
     emit();
   },

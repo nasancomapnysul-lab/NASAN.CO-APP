@@ -417,7 +417,7 @@ const T = {
   },
 };
 
-const LOGO = './assets/nasan-logo.png';
+const LOGO = './nasan-logo.png';
 
 function Mark({ color = T.ink, size = 19, font = T.sans }) {
   return (

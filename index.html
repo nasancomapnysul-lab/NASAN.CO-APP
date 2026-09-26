@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#121618">
+<meta name="apple-mobile-web-app-title" content="nasan">
+<title>nasan Company</title>
+<link rel="icon" href="assets/nasan-logo.png">
+<link rel="apple-touch-icon" href="assets/nasan-logo.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;background:#121618;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+  #root{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;box-sizing:border-box;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  a{color:#2E8C95} a:hover{color:#3FB2BD}
+  input,textarea,select{font-size:16px}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js" crossorigin></script>
+<script>window.module = { exports: {} }; window.exports = window.module.exports;</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react" src="src/nasan-store.js"></script>
+<script type="text/babel" data-presets="react" src="src/ios-frame.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/nasan-screens.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/nasan-app.jsx"></script>
+<script type="text/babel" data-presets="react">
+  const root = document.getElementById('root');
+  ReactDOM.createRoot(root).render(<window.NasanApp />);
+  const fit = () => {
+    const el = root.firstElementChild; if (!el) return;
+    el.style.transform = ''; el.style.transformOrigin = 'center center';
+    const s = Math.min(1, root.clientWidth / el.offsetWidth, root.clientHeight / el.offsetHeight);
+    el.style.transform = 'scale(' + s + ')';
+  };
+  new ResizeObserver(fit).observe(root);
+  setTimeout(fit, 300);
+</script>
+</body>
+</html>

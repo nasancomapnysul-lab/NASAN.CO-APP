@@ -10,7 +10,7 @@ function NasanApp({ phone } = {}) {
   const [langOpen, setLangOpen] = React.useState(false);
   const [dir, setDir] = React.useState('fwd');
   const [tick, setTick] = React.useState(0);
-  const [screen, setScreen] = React.useState('splash');
+  const [screen, setScreen] = React.useState(() => { const s0 = window.NasanStore && window.NasanStore.get().settings; return s0 && s0.design && s0.design.welcome === false ? 'home' : 'splash'; });
   const [menu, setMenu] = React.useState(false);
   const [replay, setReplay] = React.useState(0);
   const [cart, setCart] = React.useState([]);
@@ -41,6 +41,16 @@ function NasanApp({ phone } = {}) {
   };
   const go = (s, opts = {}) => {
     setMenu(false);
+    try {
+      const C = window.NasanStore && window.NasanStore.click;
+      if (C && typeof s === 'string') {
+        if (s.startsWith('cat:')) C('category_click', s.slice(4));
+        else if (s.startsWith('brand:')) C('brand_click', s.slice(6).split('|')[0]);
+        else if (s === 'search') C('search');
+        else if (s === 'cart') C('cart');
+        else if (s === 'lcd') C('lcd');
+      }
+    } catch (e) {}
     const base = typeof s === 'string' ? s.split(':')[0] : s;
     const dest = base === 'cat' || base === 'brand' ? 'catalog' : base;
     if (TABS.includes(dest) && !opts.push) histRef.current = [];
@@ -59,6 +69,16 @@ function NasanApp({ phone } = {}) {
     }
     setScreen(s);
   };
+  React.useEffect(() => {
+    if (!window.NasanStore || !window.NasanStore.track) return;
+    window.NasanStore.track(menu ? 'menu' : screen, scope.code || scope.brand || scope.cat || '');
+  }, [screen, menu, scope.code, scope.brand, scope.cat]);
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible' && window.NasanStore && window.NasanStore.track) window.NasanStore.track('ping');
+    }, 15000);
+    return () => clearInterval(id);
+  }, []);
   const TAB = { Shop: 'home', Brands: 'brands', Search: 'search', Orders: 'orders', LCD: 'lcd', You: 'account', Cart: 'cart', Product: 'product' };
   const onNav = (tab) => {
     if (typeof tab === 'string' && (tab.startsWith('cat:') || tab.startsWith('brand:') || tab.startsWith('product:'))) return go(tab);
@@ -97,6 +117,11 @@ function NasanApp({ phone } = {}) {
       <D>
         <div dir={li ? 'rtl' : 'ltr'} style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
           <window.LangCtx.Provider value={li}>
+          {st.settings && st.settings.general && st.settings.general.maintenance && screen !== 'splash' && (
+            <div style={{ position: 'absolute', left: 12, right: 12, bottom: 96, zIndex: 55, padding: '11px 14px', borderRadius: 14, background: '#20262A', color: '#fff', font: '500 12.5px/1.4 -apple-system, system-ui, sans-serif', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,.18)', pointerEvents: 'none' }}>
+              {['We are updating the catalog. Some products may change shortly.', 'کاتالۆگەکە نوێ دەکەینەوە. هەندێک بەرهەم لەوانەیە بگۆڕێن.', 'نقوم بتحديث الكتالوج. قد تتغير بعض المنتجات قريباً.'][li]}
+            </div>
+          )}
           <div key={screen + ':' + (scope.code || scope.brand || scope.cat || '') + ':' + tick} style={{
             height: '100%',
             animation: (dir === 'fwd' ? 'nsPageIn' : 'nsPageBack') + ' .28s cubic-bezier(.2,.8,.25,1) both',

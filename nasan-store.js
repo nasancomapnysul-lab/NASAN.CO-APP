@@ -87,14 +87,7 @@ const store = {
     { code: '2028', name: 'Flycdi FL-2000', sub: 'Micro drill and polisher', brand: 'FLYCDI', cat: 'Hand tools', kind: 'hand', stock: 13, status: 'Live' },
     { code: '2024', name: 'YYD-1502D', sub: '15V 2A compact supply', brand: 'YYD', cat: 'Power', kind: 'supply', stock: 14, status: 'Live' },
   ],
-  orders: [
-    { id: '#1802', customer: 'Shwan R.', items: 2, summary: 'Aixun T3A · 2 items', when: 'Today, 11:20', status: 'Waiting', past: false },
-    { id: '#1801', customer: 'Karwan H.', items: 1, summary: 'SUNSHINE P-3005D · 1 item', when: 'Today, 10:42', status: 'Preparing', past: false },
-    { id: '#1799', customer: 'Aram S.', items: 2, summary: 'RF4 RF-6558PRO · 2 items', when: 'Yesterday, 16:05', status: 'Ready', past: false },
-    { id: '#1782', customer: 'Dana M.', items: 1, summary: 'YX-AK49 microscope · 1 item', when: '2 Sep 2026', status: 'Picked up', past: true, shop: 'Barzar Jawazaka' },
-    { id: '#1770', customer: 'Hemin A.', items: 3, summary: 'YIHUA 3010D-IV · 3 items', when: '24 Aug 2026', status: 'Picked up', past: true, shop: 'Bazar Hama Sur' },
-    { id: '#1751', customer: 'Shwan K.', items: 5, summary: 'Relife tweezers set · 5 items', when: '11 Aug 2026', status: 'Picked up', past: true, shop: 'Kirkuk' },
-  ],
+  orders: [],
   lang: 0,
   signedIn: false,
   account: {
@@ -127,16 +120,14 @@ function loadAccounts() {
     const raw = localStorage.getItem(ACC_KEY);
     if (raw) {
       /* drop truncated/invalid photo data (a real 320px JPEG is tens of KB) */
-      return JSON.parse(raw).map(a => (a.photo && /^data:/.test(a.photo) && a.photo.length < 200 ? { ...a, photo: '' } : a));
+      return JSON.parse(raw)
+        .filter(a => a.email !== 'demo@nasan.company')
+        .map(a => (a.photo && /^data:/.test(a.photo) && a.photo.length < 200 ? { ...a, photo: '' } : a));
     }
   } catch (e) {}
-  return [{
-    first: 'Demo', middle: '', last: 'Account', email: 'demo@nasan.company', phone: '770 000 0000',
-    hash: pwHash('demo@nasan.company', 'nasan2026'), photo: '', city: 'Sulaymaniyah',
-    phoneVerified: true, emailVerified: true,
-  }];
+  return [];
 }
-function saveAccounts() { try { localStorage.setItem(ACC_KEY, JSON.stringify(store.accounts)); } catch (e) {} }
+function saveAccounts() { try { localStorage.setItem(ACC_KEY, JSON.stringify(store.accounts)); } catch (e) {} cloudSet('accounts', store.accounts); }
 store.accounts = loadAccounts();
 
 /* Stay signed in across reloads and app restarts: the session (which account,
@@ -162,6 +153,184 @@ function saveSession() {
   } catch (e) {}
 })();
 
+/* Orders are kept on this device, tagged with the account that placed them. */
+const ORD_KEY = 'nasan-orders-v1';
+function saveOrders() { try { localStorage.setItem(ORD_KEY, JSON.stringify(store.orders)); } catch (e) {} cloudSet('orders', store.orders); }
+try { const r = localStorage.getItem(ORD_KEY); if (r) store.orders = JSON.parse(r); } catch (e) {}
+function currentOwner() {
+  if (!store.signedIn) return '';
+  return (store.sessionEmail || store.account.email || store.account.phone || 'google').toLowerCase();
+}
+
+/* ── Live traffic ──
+   Every screen view and a 15s heartbeat are logged with an anonymous device id.
+   Saved to localStorage and shared across open tabs (storage event), so the admin
+   panel in one tab sees the app in another tab update live. With Supabase this
+   same log goes to a shared table and covers every phone. */
+const TRF_KEY = 'nasan-traffic-v1';
+const DEV_KEY = 'nasan-device-v1';
+let deviceId = '';
+try { deviceId = localStorage.getItem(DEV_KEY) || ''; } catch (e) {}
+if (!deviceId) { deviceId = 'd' + Math.random().toString(36).slice(2, 9); try { localStorage.setItem(DEV_KEY, deviceId); } catch (e) {} }
+try { const r = localStorage.getItem('nasan-products-v1'); if (r) { const p = JSON.parse(r); if (Array.isArray(p) && p.length) store.products = p; } } catch (e) {}
+store.traffic = [];
+try { const r = localStorage.getItem(TRF_KEY); if (r) store.traffic = JSON.parse(r); } catch (e) {}
+const CTX = (() => {
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  const dv = /iPad|Tablet/i.test(ua) ? 'tablet' : /Mobi|iPhone|Android/i.test(ua) ? 'mobile' : 'desktop';
+  const br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /FxiOS|Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Other';
+  let src = 'direct';
+  try {
+    const r = document.referrer ? new URL(document.referrer).hostname : '';
+    if (r && r !== location.hostname) src = /google\./.test(r) ? 'google' : /facebook|fb\./.test(r) ? 'facebook' : /instagram/.test(r) ? 'instagram' : /tiktok/.test(r) ? 'tiktok' : /t\.co|twitter|x\.com/.test(r) ? 'x' : /whatsapp|wa\.me/.test(r) ? 'whatsapp' : r.replace(/^www\./, '');
+    const u = new URLSearchParams(location.search).get('utm_source'); if (u) src = u;
+  } catch (e) {}
+  return { dv, br, src };
+})();
+/* page load time for this device, logged once */
+try {
+  window.addEventListener('load', () => setTimeout(() => {
+    const n = performance.getEntriesByType('navigation')[0];
+    const ms = n ? Math.round(n.loadEventEnd || n.duration) : 0;
+    if (ms > 0) { cloudEvent({ t: Date.now(), d: deviceId, s: 'load', x: String(ms), dv: CTX.dv, br: CTX.br, src: CTX.src }); saveTraffic(); }
+  }, 50));
+  /* outbound link clicks anywhere in the app */
+  document.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    const h = a.getAttribute('href') || '';
+    const kind = /wa\.me|whatsapp/.test(h) ? 'whatsapp' : /tiktok/.test(h) ? 'tiktok' : /instagram/.test(h) ? 'instagram' : /facebook/.test(h) ? 'facebook' : /x\.com|twitter/.test(h) ? 'x' : /maps|goo\.gl/.test(h) ? 'maps' : /^tel:/.test(h) ? 'call' : '';
+    if (kind) NasanStore.click(kind);
+  }, true);
+} catch (e) {}
+function saveTraffic() {
+  if (store.traffic.length > 1500) store.traffic = store.traffic.slice(-1200);
+  try { localStorage.setItem(TRF_KEY, JSON.stringify(store.traffic)); } catch (e) {}
+}
+try {
+  window.addEventListener('storage', (e) => {
+    if (e.key === TRF_KEY && e.newValue) { try { store.traffic = JSON.parse(e.newValue); emit(); } catch (x) {} }
+    if (e.key === 'nasan-orders-v1' && e.newValue) { try { store.orders = JSON.parse(e.newValue); emit(); } catch (x) {} }
+  });
+} catch (e) {}
+
+/* ── Diagnostics: app errors are caught and kept (last 100) ── */
+const ERR_KEY = 'nasan-errors-v1';
+store.errors = [];
+try { const r = localStorage.getItem(ERR_KEY); if (r) store.errors = JSON.parse(r); } catch (e) {}
+store.bootedAt = Date.now();
+function logError(kind, msg, where) {
+  store.errors.push({ t: Date.now(), kind, msg: String(msg || 'Unknown error').slice(0, 300), where: String(where || '').slice(0, 160) });
+  if (store.errors.length > 100) store.errors = store.errors.slice(-100);
+  try { localStorage.setItem(ERR_KEY, JSON.stringify(store.errors)); } catch (e) {}
+  try { emit(); } catch (e) {}
+}
+try {
+  window.addEventListener('error', (e) => logError('Error', e.message, (e.filename || '').split('/').pop() + (e.lineno ? ':' + e.lineno : '')));
+  window.addEventListener('unhandledrejection', (e) => logError('Promise', e.reason && (e.reason.message || e.reason), ''));
+  window.addEventListener('online', () => emit());
+  window.addEventListener('offline', () => emit());
+} catch (e) {}
+
+/* ── Site settings + translation overrides (edited in admin, applied live) ── */
+const SET_KEY = 'nasan-settings-v1';
+const TR_KEY = 'nasan-tr-v1';
+const DEFAULT_SETTINGS = {
+  general: { storeName: 'nasan Company', whatsapp: '9647704149292', email: 'info@nasan.company', city: 'Sulaymaniyah', maintenance: false },
+  design: { accent: '#3FB2BD', accentDeep: '#2C8F99', radius: 'Rounded', welcome: true },
+  hero: { code: '1402', label: '', lcdCode: '' },
+  social: {
+    TikTok: 'https://www.tiktok.com/@nasan.company',
+    Instagram: 'https://www.instagram.com/nasan.company.iq',
+    Facebook: 'https://www.facebook.com/share/1JHQbX6fyc/',
+    X: 'https://x.com/nasancompany',
+  },
+  assistant: { enabled: true, greeting: 'Hello nasan Company, ', autoAttach: true },
+  security: { loginOn: false, adminEmail: '', passHash: '', pinOn: false, pinHash: '', lockMins: 15, maxTries: 5 },
+  owner: { name: 'Yadgar', role: 'Owner', city: 'Sulaymaniyah', email: '', phone: '', bio: '', photo: '' },
+  team: { list: [], active: '' },
+};
+function merge(base, over) {
+  const o = {};
+  Object.keys(base).forEach(k => { o[k] = { ...base[k], ...((over || {})[k] || {}) }; });
+  return o;
+}
+store.settings = merge(DEFAULT_SETTINGS, {});
+store.trOverrides = { 0: {}, 1: {}, 2: {} };
+try { const r = localStorage.getItem(SET_KEY); if (r) store.settings = merge(DEFAULT_SETTINGS, JSON.parse(r)); } catch (e) {}
+try { const r = localStorage.getItem(TR_KEY); if (r) store.trOverrides = { 0: {}, 1: {}, 2: {}, ...JSON.parse(r) }; } catch (e) {}
+function saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify(store.settings)); } catch (e) {} cloudSet('settings', store.settings); }
+function saveTr() { try { localStorage.setItem(TR_KEY, JSON.stringify(store.trOverrides)); } catch (e) {} cloudSet('translations', store.trOverrides); }
+function saveProducts() { try { localStorage.setItem('nasan-products-v1', JSON.stringify(store.products)); } catch (e) {} cloudSet('products', store.products); }
+try {
+  window.addEventListener('storage', (e) => {
+    if (e.key === SET_KEY && e.newValue) { try { store.settings = merge(DEFAULT_SETTINGS, JSON.parse(e.newValue)); emit(); } catch (x) {} }
+    if (e.key === TR_KEY && e.newValue) { try { store.trOverrides = { 0: {}, 1: {}, 2: {}, ...JSON.parse(e.newValue) }; emit(); } catch (x) {} }
+  });
+} catch (e) {}
+
+/* ── Firebase Realtime Database ──
+   Turns on when nasan-firebase.js provides window.NASAN_FIREBASE and the Firebase
+   compat SDK is loaded (index.html / admin.html). Every save is mirrored to
+   /nasan/<node>; every device listens and updates live. Without it, the app
+   keeps working on this device only. */
+store.cloud = 'off';
+let cloudDb = null;
+const cloudApplying = {};
+function cloudClean(v) { return v === undefined ? null : JSON.parse(JSON.stringify(v)); }
+function cloudSet(node, val) {
+  if (!cloudDb || cloudApplying[node]) return;
+  try { cloudDb.ref('nasan/' + node).set(cloudClean(val)); } catch (e) { logErrorSafe('Cloud', e.message, node); }
+}
+function cloudEvent(evt) {
+  if (cloudDb) {
+    try { const r = cloudDb.ref('nasan/traffic').push(); evt.k = r.key; r.set(evt); } catch (e) {}
+  }
+  store.traffic.push(evt);
+}
+function logErrorSafe(k, m, w) { try { logError(k, m, w); } catch (e) {} }
+function cloudStart() {
+  const cfg = window.NASAN_FIREBASE;
+  const fb = window.firebase;
+  if (!cfg || !cfg.databaseURL || !fb || !fb.database) return;
+  try {
+    const app = fb.apps && fb.apps.length ? fb.app() : fb.initializeApp(cfg);
+    cloudDb = app.database();
+  } catch (e) { store.cloud = 'error'; logErrorSafe('Cloud', e.message, 'init'); return; }
+  store.cloud = 'connecting'; emit();
+  cloudDb.ref('.info/connected').on('value', s => { store.cloud = s.val() ? 'online' : 'offline'; emit(); });
+  const nodes = {
+    products: { get: () => store.products, put: v => { if (Array.isArray(v)) { store.products = v; try { localStorage.setItem('nasan-products-v1', JSON.stringify(v)); } catch (e) {} } } },
+    orders: { get: () => store.orders, put: v => { store.orders = Array.isArray(v) ? v : []; try { localStorage.setItem(ORD_KEY, JSON.stringify(store.orders)); } catch (e) {} } },
+    accounts: { get: () => store.accounts, put: v => { store.accounts = Array.isArray(v) ? v : []; try { localStorage.setItem(ACC_KEY, JSON.stringify(store.accounts)); } catch (e) {} } },
+    settings: { get: () => store.settings, put: v => { if (v) { store.settings = merge(DEFAULT_SETTINGS, v); try { localStorage.setItem(SET_KEY, JSON.stringify(store.settings)); } catch (e) {} } } },
+    translations: { get: () => store.trOverrides, put: v => { store.trOverrides = { 0: {}, 1: {}, 2: {}, ...(v || {}) }; try { localStorage.setItem(TR_KEY, JSON.stringify(store.trOverrides)); } catch (e) {} } },
+  };
+  Object.keys(nodes).forEach(node => {
+    const n = nodes[node];
+    cloudDb.ref('nasan/' + node).on('value', snap => {
+      const v = snap.val();
+      if (v === null) { cloudSet(node, n.get()); return; }   // first run: upload this device's data
+      cloudApplying[node] = true;
+      try { n.put(v); } finally { cloudApplying[node] = false; }
+      emit();
+    }, err => { store.cloud = 'denied'; logErrorSafe('Cloud', err && err.message, node); emit(); });
+  });
+  const seen = new Set(store.traffic.map(e => e.k).filter(Boolean));
+  cloudDb.ref('nasan/traffic').orderByChild('t').limitToLast(1500).on('child_added', snap => {
+    if (seen.has(snap.key)) return;
+    seen.add(snap.key);
+    const e = snap.val(); if (!e) return;
+    if (store.traffic.some(x => x.k === snap.key)) return;
+    store.traffic.push({ ...e, k: snap.key });
+    store.traffic.sort((a, b) => a.t - b.t);
+    if (store.traffic.length > 1500) store.traffic = store.traffic.slice(-1200);
+    try { localStorage.setItem(TRF_KEY, JSON.stringify(store.traffic)); } catch (x) {}
+    emit();
+  });
+  cloudDb.ref('nasan/traffic').on('value', snap => { if (snap.val() === null && store.traffic.some(e => e.k)) { store.traffic = store.traffic.filter(e => !e.k); emit(); } });
+}
+
 function emit() {
   store.rev++;
   listeners.forEach(fn => { try { fn(store.rev); } catch (e) { /* listener detached */ } });
@@ -184,9 +353,28 @@ const NasanStore = {
     const d = normPhone(v);
     return d ? store.accounts.find(a => normPhone(a.phone) === d) || null : null;
   },
+  setAccountStatus(email, status, reason) {
+    const a = store.accounts.find(x => x.email === String(email || '').toLowerCase());
+    if (!a) return;
+    a.status = status; a.statusReason = reason || ''; a.statusAt = Date.now();
+    saveAccounts();
+    if (status === 'suspended' && store.signedIn && store.sessionEmail === a.email) NasanStore.signOut();
+    emit();
+  },
+  deleteAccount(email) {
+    const e = String(email || '').toLowerCase();
+    const a = store.accounts.find(x => x.email === e);
+    if (!a) return;
+    store.accounts = store.accounts.filter(x => x.email !== e);
+    saveAccounts();
+    store.orders.forEach(o => { if (o.owner === e || (a.phone && o.owner === String(a.phone).toLowerCase())) { o.customer = (o.customer || 'Customer') + ' (deleted)'; o.ownerDeleted = true; } });
+    saveOrders();
+    if (store.signedIn && store.sessionEmail === e) NasanStore.signOut();
+    emit();
+  },
   checkPassword(acc, pass) { return !!acc && acc.hash === pwHash(acc.email, pass); },
   registerAccount(form) {
-    const rec = { ...form, email: form.email.trim().toLowerCase(), hash: pwHash(form.email.trim(), form.pass) };
+    const rec = { ...form, email: form.email.trim().toLowerCase(), hash: pwHash(form.email.trim(), form.pass), createdAt: Date.now(), lastSignIn: Date.now(), device: (typeof CTX !== 'undefined' ? CTX.dv + ' · ' + CTX.br : ''), status: 'active' };
     delete rec.pass; delete rec.confirm; delete rec.identifier;
     store.accounts.push(rec); saveAccounts();
     store.sessionEmail = rec.email; emit();
@@ -202,6 +390,9 @@ const NasanStore = {
     emit();
   },
   startSession(acc) {
+    if (acc && acc.status === 'suspended') return false;
+    const rec = store.accounts.find(x => x.email === acc.email);
+    if (rec) { rec.lastSignIn = Date.now(); rec.signIns = (rec.signIns || 0) + 1; saveAccounts(); }
     store.sessionEmail = acc.email;
     Object.assign(store.account, { ...acc, pass: '', confirm: '', identifier: '' });
     delete store.account.hash;
@@ -217,12 +408,12 @@ const NasanStore = {
     const p = store.products.find(x => x.code === code);
     if (!p) return;
     Object.assign(p, patch);
-    emit();
+    saveProducts(); emit();
   },
-  addProduct(p) { store.products.unshift(p); emit(); },
+  addProduct(p) { store.products.unshift(p); saveProducts(); emit(); },
   removeProduct(code) {
     store.products = store.products.filter(x => x.code !== code);
-    emit();
+    saveProducts(); emit();
   },
 
   setOrderStatus(id, status) {
@@ -231,9 +422,61 @@ const NasanStore = {
     o.status = status;
     o.past = status === 'Picked up' || status === 'Collected' || status === 'Cancelled';
     o.updatedAt = Date.now();
-    emit();
+    saveOrders(); emit();
   },
-  addOrder(order) { store.orders.unshift(order); emit(); },
+  addOrder(order) {
+    const owner = currentOwner();
+    if (!owner) return false;
+    let id = order.id;
+    while (store.orders.some(x => x.id === id)) id = '#' + (1802 + Math.floor(Math.random() * 8000));
+    store.orders.unshift({ ...order, id, owner, customer: [store.account.first, store.account.last].filter(Boolean).join(' ') || order.customer });
+    cloudEvent({ t: Date.now(), d: deviceId, s: 'order', x: id, lang: store.lang || 0 });
+    saveTraffic();
+    saveOrders(); emit();
+    return id;
+  },
+  currentOwner,
+  track(screen, detail, dev, ctx) {
+    const c = ctx || CTX;
+    cloudEvent({ t: Date.now(), d: dev || deviceId, s: screen, x: detail || '', lang: store.lang || 0, dv: c.dv, br: c.br, src: c.src });
+    saveTraffic(); emit();
+  },
+  click(kind, detail) { NasanStore.track('click', kind + (detail ? ':' + detail : '')); },
+  deviceId: () => deviceId,
+  clearTraffic() { store.traffic = []; saveTraffic(); cloudSet('traffic', null); emit(); },
+  logError,
+  defaults: () => DEFAULT_SETTINGS,
+  setSetting(section, key, val) {
+    store.settings = { ...store.settings, [section]: { ...store.settings[section], [key]: val } };
+    saveSettings(); emit();
+  },
+  saveTranslations(li, map) {
+    const clean = {};
+    Object.keys(map).forEach(k => { const v = (map[k] || '').trim(); if (v) clean[k] = v; });
+    store.trOverrides = { ...store.trOverrides, [li]: clean };
+    saveTr(); emit();
+  },
+  exportBackup() {
+    return JSON.stringify({
+      app: 'nasan', version: 1, exportedAt: new Date().toISOString(),
+      products: store.products, orders: store.orders, settings: store.settings,
+      translations: store.trOverrides,
+      accounts: (store.accounts || []).map(a => ({ ...a, photo: a.photo && a.photo.length > 200000 ? '' : a.photo })),
+    }, null, 2);
+  },
+  importBackup(text) {
+    const d = JSON.parse(text);
+    if (!d || d.app !== 'nasan') throw new Error('This is not a nasan backup file');
+    if (Array.isArray(d.products)) store.products = d.products;
+    if (Array.isArray(d.orders)) { store.orders = d.orders; saveOrders(); }
+    if (d.settings) { store.settings = merge(DEFAULT_SETTINGS, d.settings); saveSettings(); }
+    if (d.translations) { store.trOverrides = { 0: {}, 1: {}, 2: {}, ...d.translations }; saveTr(); }
+    emit();
+    return { products: (d.products || []).length, orders: (d.orders || []).length };
+  },
+  resetSettings() { store.settings = merge(DEFAULT_SETTINGS, {}); saveSettings(); emit(); },
+  clearErrors() { store.errors = []; try { localStorage.setItem(ERR_KEY, '[]'); } catch (e) {} emit(); },
+  myOrders() { const o = currentOwner(); return o ? store.orders.filter(x => x.owner === o) : []; },
 };
 
 /* React hook: re-render on any store change */
@@ -245,4 +488,6 @@ function useStore() {
 
 window.NasanStore = NasanStore;
 window.useNasanStore = useStore;
+NasanStore.cloudStatus = () => store.cloud;
+try { cloudStart(); } catch (e) {}
 module.exports = { NasanStore, useStore };

@@ -806,7 +806,11 @@ function AdminSignIn({ st, prefill, onOk }) {
   const accounts = list.filter(p => p.email && p.passHash);
   const sec = (st.settings && st.settings.security) || {};
   const mode = 'in';
-  const first = !accounts.length;
+  const NSx = window.NasanStore;
+  const cloud = !!(NSx && NSx.adminCloud && NSx.adminCloud());
+  const first = !cloud && !accounts.length;
+  const [busy, setBusy] = React.useState(false);
+  const [resetMsg, setResetMsg] = React.useState('');
   const [email, setEmail] = React.useState(prefill || '');
   const [name, setName] = React.useState('');
   const [pass, setPass] = React.useState('');
@@ -826,6 +830,21 @@ function AdminSignIn({ st, prefill, onOk }) {
     const e = email.trim().toLowerCase();
     if (!ADMIN_EMAIL_RE.test(e)) { setErr('Enter your full email address'); return shake(); }
     if (!pass) { setErr('Enter your password'); return shake(); }
+    if (cloud) {
+      if (busy) return;
+      setBusy(true); setErr('');
+      NSx.adminSignIn(e, pass).then(r => {
+        setBusy(false);
+        if (r.ok) {
+          const acc2 = accounts.find(p => p.email.toLowerCase() === e);
+          if (acc2) saveTeam(list, acc2.id);
+          else { const owner = { ...(list[0] || { id: 'p1', name: 'Owner', role: 'Owner', city: 'Sulaymaniyah' }), email: e }; delete owner.passHash; saveTeam([owner, ...list.slice(1)], owner.id); }
+          onOk(); return;
+        }
+        setPass(''); shake(); setErr(r.err);
+      });
+      return;
+    }
     if (first) {
       if (pass.length < 8) { setErr('Password must be at least 8 characters'); return shake(); }
       const k = 0;
@@ -866,11 +885,18 @@ function AdminSignIn({ st, prefill, onOk }) {
           <span style={{ font: `700 15px/1 ${A.sans}`, color: A.ink }}>nasan <span style={{ color: A.ink45, fontWeight: 500 }}>admin</span></span>
         </div>
         <div style={{ marginTop: 22, font: `700 22px/1.15 ${A.sans}`, letterSpacing: '-0.02em', color: A.ink }}>{isNew ? 'Create admin account' : 'Sign in'}</div>
-        <div style={{ marginTop: 6, font: `400 13.5px/1.45 ${A.sans}`, color: A.ink70 }}>{first ? 'First sign-in on this device sets your admin email and password.' : 'Use your admin email and password.'}</div>
+        <div style={{ marginTop: 6, font: `400 13.5px/1.45 ${A.sans}`, color: A.ink70 }}>{cloud ? 'Use the admin email and password from Firebase Authentication.' : first ? 'First sign-in on this device sets your admin email and password.' : 'Use your admin email and password.'}</div>
 
         {forgot && !isNew ? (
           <div style={{ marginTop: 20, padding: '14px 16px', borderRadius: 12, background: A.paper, font: `400 13px/1.55 ${A.sans}`, color: A.ink70 }}>
-            Ask the store owner to reset your password from <b style={{ color: A.ink }}>Settings → Security</b>. If you are the owner, restore a backup file or clear this site's data on this device.
+            {cloud ? (
+              <React.Fragment>
+                We'll email a reset link to the address above.
+                <div onClick={() => { const e = email.trim().toLowerCase(); if (!ADMIN_EMAIL_RE.test(e)) { setResetMsg('Enter your email above first'); return; } NSx.adminReset(e).then(ok => setResetMsg(ok ? 'Reset link sent. Check your inbox.' : 'Could not send. Check the email.')); }}
+                  style={{ marginTop: 10, font: `600 13px/1 ${A.sans}`, color: A.ink, cursor: 'pointer' }}>Send reset link</div>
+                {resetMsg && <div style={{ marginTop: 8, color: A.tealDeep }}>{resetMsg}</div>}
+              </React.Fragment>
+            ) : <React.Fragment>Ask the store owner to reset your password from <b style={{ color: A.ink }}>Settings → Security</b>. If you are the owner, restore a backup file or clear this site's data on this device.</React.Fragment>}
             <div onClick={() => setForgot(false)} style={{ marginTop: 10, font: `600 13px/1 ${A.sans}`, color: A.tealDeep, cursor: 'pointer' }}>← Back to sign in</div>
           </div>
         ) : (
@@ -891,7 +917,7 @@ function AdminSignIn({ st, prefill, onOk }) {
         {err && !forgot && <div style={{ marginTop: 12, font: `500 12.5px/1.35 ${A.sans}`, color: '#B4443A' }}>{wait > 0 ? 'Too many tries. Wait ' + wait + 's.' : err}</div>}
         {!forgot && (
           <div onClick={isNew ? create : signIn} style={{ marginTop: 18, padding: '14px 0', borderRadius: 10, textAlign: 'center', background: wait > 0 ? 'rgba(32,38,42,0.1)' : A.ink, color: wait > 0 ? A.ink45 : '#fff', font: `600 14.5px/1 ${A.sans}`, cursor: wait > 0 ? 'default' : 'pointer' }}>
-            {isNew ? 'Create account' : 'Sign in'}
+            {isNew ? 'Create account' : busy ? 'Signing in…' : 'Sign in'}
           </div>
         )}
 

@@ -11,3 +11,6 @@ window.NASAN_FIREBASE = {
   measurementId: 'G-6ZWXTYKZJ7',
 };
 if (!window.NASAN_FIREBASE.apiKey) window.NASAN_FIREBASE = null;
+
+/* Only this Firebase Authentication user can edit the app. */
+window.NASAN_ADMIN_UID = 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2';

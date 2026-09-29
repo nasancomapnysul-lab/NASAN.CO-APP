@@ -269,52 +269,112 @@ try {
   });
 } catch (e) {}
 
-/* ── Firebase Realtime Database ──
-   Turns on when nasan-firebase.js provides window.NASAN_FIREBASE and the Firebase
-   compat SDK is loaded (index.html / admin.html). Every save is mirrored to
-   /nasan/<node>; every device listens and updates live. Without it, the app
-   keeps working on this device only. */
+/* ── Firebase Realtime Database + Auth ──
+   Public (anyone can read, only the admin can write): products, settings, translations.
+   Admin only: nasan/admin (security + team), the full orders, accounts and traffic lists.
+   Customers write their own order / account records under unguessable keys and can
+   only read a record if they know its key. Rules: firebase-rules.json. */
 store.cloud = 'off';
-let cloudDb = null;
+store.cloudAdmin = false;
+let cloudDb = null, cloudAuth = null, adminLive = false;
 const cloudApplying = {};
+const cloudNull = new Set();
+const ADMIN_UID = () => window.NASAN_ADMIN_UID || '';
+const PUBLIC_NODES = ['products', 'settings', 'translations'];
 function cloudClean(v) { return v === undefined ? null : JSON.parse(JSON.stringify(v)); }
+function logErrorSafe(k, m, w) { try { logError(k, m, w); } catch (e) {} }
+function newKey() { return cloudDb ? cloudDb.ref('nasan/orders').push().key : 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
+function publicSettings(s) { const c = cloudClean(s) || {}; delete c.security; delete c.team; return c; }
+function toMap(list) {
+  const m = {};
+  (list || []).forEach(x => { if (!x.ck) x.ck = newKey(); m[x.ck] = cloudClean(x); });
+  return m;
+}
 function cloudSet(node, val) {
   if (!cloudDb || cloudApplying[node]) return;
-  try { cloudDb.ref('nasan/' + node).set(cloudClean(val)); } catch (e) { logErrorSafe('Cloud', e.message, node); }
+  const admin = store.cloudAdmin;
+  try {
+    if (node === 'settings') {
+      if (!admin) return;
+      cloudDb.ref('nasan/settings').set(publicSettings(val));
+      cloudDb.ref('nasan/admin').update(cloudClean({ security: (val || {}).security || {}, team: (val || {}).team || {} }));
+    } else if (node === 'products' || node === 'translations') {
+      if (admin) cloudDb.ref('nasan/' + node).set(cloudClean(val));
+    } else if (node === 'orders' || node === 'accounts') {
+      if (admin && val && val.length) cloudDb.ref('nasan/' + node).update(toMap(val));
+    } else if (node === 'traffic') {
+      if (admin) cloudDb.ref('nasan/traffic').set(null);
+    }
+  } catch (e) { logErrorSafe('Cloud', e.message, node); }
+}
+function cloudPut(node, rec) {
+  if (!cloudDb || !rec) return;
+  if (!rec.ck) rec.ck = newKey();
+  cloudDb.ref('nasan/' + node + '/' + rec.ck).set(cloudClean(rec)).catch(e => logErrorSafe('Cloud', e.message, node));
+}
+function cloudRemove(node, rec) {
+  if (cloudDb && rec && rec.ck && store.cloudAdmin) cloudDb.ref('nasan/' + node + '/' + rec.ck).remove().catch(() => {});
 }
 function cloudEvent(evt) {
   if (cloudDb) {
-    try { const r = cloudDb.ref('nasan/traffic').push(); evt.k = r.key; r.set(evt); } catch (e) {}
+    try { const r = cloudDb.ref('nasan/traffic').push(); evt.k = r.key; r.set(evt).catch(() => {}); } catch (e) {}
   }
   store.traffic.push(evt);
 }
-function logErrorSafe(k, m, w) { try { logError(k, m, w); } catch (e) {} }
-function cloudStart() {
-  const cfg = window.NASAN_FIREBASE;
-  const fb = window.firebase;
-  if (!cfg || !cfg.databaseURL || !fb || !fb.database) return;
+/* customer device: follow its own orders so admin status changes arrive live */
+const followed = new Set();
+function followOwnOrders() {
+  if (!cloudDb || store.cloudAdmin) return;
+  store.orders.forEach(o => {
+    if (!o.ck || followed.has(o.ck)) return;
+    followed.add(o.ck);
+    cloudDb.ref('nasan/orders/' + o.ck).on('value', snap => {
+      const v = snap.val(); if (!v) return;
+      const i = store.orders.findIndex(x => x.ck === o.ck); if (i < 0) return;
+      store.orders[i] = { ...store.orders[i], ...v };
+      try { localStorage.setItem(ORD_KEY, JSON.stringify(store.orders)); } catch (e) {}
+      emit();
+    }, () => {});
+  });
+}
+function applyNode(node, v) {
+  cloudApplying[node] = true;
   try {
-    const app = fb.apps && fb.apps.length ? fb.app() : fb.initializeApp(cfg);
-    cloudDb = app.database();
-  } catch (e) { store.cloud = 'error'; logErrorSafe('Cloud', e.message, 'init'); return; }
-  store.cloud = 'connecting'; emit();
-  cloudDb.ref('.info/connected').on('value', s => { store.cloud = s.val() ? 'online' : 'offline'; emit(); });
-  const nodes = {
-    products: { get: () => store.products, put: v => { if (Array.isArray(v)) { store.products = v; try { localStorage.setItem('nasan-products-v1', JSON.stringify(v)); } catch (e) {} } } },
-    orders: { get: () => store.orders, put: v => { store.orders = Array.isArray(v) ? v : []; try { localStorage.setItem(ORD_KEY, JSON.stringify(store.orders)); } catch (e) {} } },
-    accounts: { get: () => store.accounts, put: v => { store.accounts = Array.isArray(v) ? v : []; try { localStorage.setItem(ACC_KEY, JSON.stringify(store.accounts)); } catch (e) {} } },
-    settings: { get: () => store.settings, put: v => { if (v) { store.settings = merge(DEFAULT_SETTINGS, v); try { localStorage.setItem(SET_KEY, JSON.stringify(store.settings)); } catch (e) {} } } },
-    translations: { get: () => store.trOverrides, put: v => { store.trOverrides = { 0: {}, 1: {}, 2: {}, ...(v || {}) }; try { localStorage.setItem(TR_KEY, JSON.stringify(store.trOverrides)); } catch (e) {} } },
-  };
-  Object.keys(nodes).forEach(node => {
-    const n = nodes[node];
+    if (node === 'products' && Array.isArray(v)) { store.products = v; try { localStorage.setItem('nasan-products-v1', JSON.stringify(v)); } catch (e) {} }
+    if (node === 'settings' && v) {
+      store.settings = merge(DEFAULT_SETTINGS, { ...v, security: store.settings.security, team: store.settings.team });
+      try { localStorage.setItem(SET_KEY, JSON.stringify(store.settings)); } catch (e) {}
+    }
+    if (node === 'translations') { store.trOverrides = { 0: {}, 1: {}, 2: {}, ...(v || {}) }; try { localStorage.setItem(TR_KEY, JSON.stringify(store.trOverrides)); } catch (e) {} }
+  } finally { cloudApplying[node] = false; }
+  emit();
+}
+function startAdminListeners() {
+  if (adminLive) return; adminLive = true;
+  cloudNull.forEach(node => cloudSet(node, node === 'products' ? store.products : node === 'settings' ? store.settings : store.trOverrides));
+  cloudNull.clear();
+  cloudDb.ref('nasan/admin').on('value', snap => {
+    const v = snap.val();
+    if (!v) { cloudSet('settings', store.settings); return; }
+    cloudApplying.settings = true;
+    try { store.settings = merge(DEFAULT_SETTINGS, { ...store.settings, security: v.security || store.settings.security, team: v.team || store.settings.team }); } finally { cloudApplying.settings = false; }
+    try { localStorage.setItem(SET_KEY, JSON.stringify(store.settings)); } catch (e) {}
+    emit();
+  });
+  ['orders', 'accounts'].forEach(node => {
     cloudDb.ref('nasan/' + node).on('value', snap => {
       const v = snap.val();
-      if (v === null) { cloudSet(node, n.get()); return; }   // first run: upload this device's data
-      cloudApplying[node] = true;
-      try { n.put(v); } finally { cloudApplying[node] = false; }
+      const local = node === 'orders' ? store.orders : store.accounts;
+      if (!v) { if (local.length) cloudSet(node, local); return; }
+      const list = Object.keys(v).map(k => ({ ...v[k], ck: k }));
+      if (node === 'orders') {
+        list.sort((x, y) => (y.createdAt || y.updatedAt || 0) - (x.createdAt || x.updatedAt || 0));
+        store.orders = list; try { localStorage.setItem(ORD_KEY, JSON.stringify(list)); } catch (e) {}
+      } else {
+        store.accounts = list; try { localStorage.setItem(ACC_KEY, JSON.stringify(list)); } catch (e) {}
+      }
       emit();
-    }, err => { store.cloud = 'denied'; logErrorSafe('Cloud', err && err.message, node); emit(); });
+    }, err => logErrorSafe('Cloud', err && err.message, node));
   });
   const seen = new Set(store.traffic.map(e => e.k).filter(Boolean));
   cloudDb.ref('nasan/traffic').orderByChild('t').limitToLast(1500).on('child_added', snap => {
@@ -323,12 +383,40 @@ function cloudStart() {
     const e = snap.val(); if (!e) return;
     if (store.traffic.some(x => x.k === snap.key)) return;
     store.traffic.push({ ...e, k: snap.key });
-    store.traffic.sort((a, b) => a.t - b.t);
+    store.traffic.sort((p, q) => p.t - q.t);
     if (store.traffic.length > 1500) store.traffic = store.traffic.slice(-1200);
     try { localStorage.setItem(TRF_KEY, JSON.stringify(store.traffic)); } catch (x) {}
     emit();
+  }, () => {});
+}
+function cloudStart() {
+  const cfg = window.NASAN_FIREBASE;
+  const fb = window.firebase;
+  if (!cfg || !cfg.databaseURL || !fb || !fb.database) return;
+  try {
+    const app = fb.apps && fb.apps.length ? fb.app() : fb.initializeApp(cfg);
+    cloudDb = app.database();
+    if (fb.auth) cloudAuth = app.auth();
+  } catch (e) { store.cloud = 'error'; logErrorSafe('Cloud', e.message, 'init'); return; }
+  store.cloud = 'connecting'; emit();
+  cloudDb.ref('.info/connected').on('value', s => { store.cloud = s.val() ? 'online' : 'offline'; emit(); });
+  PUBLIC_NODES.forEach(node => {
+    cloudDb.ref('nasan/' + node).on('value', snap => {
+      const v = snap.val();
+      if (v === null) { cloudNull.add(node); if (store.cloudAdmin) cloudSet(node, node === 'products' ? store.products : node === 'settings' ? store.settings : store.trOverrides); return; }
+      cloudNull.delete(node);
+      applyNode(node, v);
+    }, err => { store.cloud = 'denied'; logErrorSafe('Cloud', err && err.message, node); emit(); });
   });
-  cloudDb.ref('nasan/traffic').on('value', snap => { if (snap.val() === null && store.traffic.some(e => e.k)) { store.traffic = store.traffic.filter(e => !e.k); emit(); } });
+  if (cloudAuth) {
+    cloudAuth.onAuthStateChanged(u => {
+      store.cloudAdmin = !!(u && ADMIN_UID() && u.uid === ADMIN_UID());
+      store.cloudUser = u ? u.email : '';
+      if (store.cloudAdmin) startAdminListeners();
+      emit();
+    });
+  }
+  followOwnOrders();
 }
 
 function emit() {
@@ -357,7 +445,7 @@ const NasanStore = {
     const a = store.accounts.find(x => x.email === String(email || '').toLowerCase());
     if (!a) return;
     a.status = status; a.statusReason = reason || ''; a.statusAt = Date.now();
-    saveAccounts();
+    saveAccounts(); cloudPut('accounts', a);
     if (status === 'suspended' && store.signedIn && store.sessionEmail === a.email) NasanStore.signOut();
     emit();
   },
@@ -366,6 +454,7 @@ const NasanStore = {
     const a = store.accounts.find(x => x.email === e);
     if (!a) return;
     store.accounts = store.accounts.filter(x => x.email !== e);
+    cloudRemove('accounts', a);
     saveAccounts();
     store.orders.forEach(o => { if (o.owner === e || (a.phone && o.owner === String(a.phone).toLowerCase())) { o.customer = (o.customer || 'Customer') + ' (deleted)'; o.ownerDeleted = true; } });
     saveOrders();
@@ -376,7 +465,7 @@ const NasanStore = {
   registerAccount(form) {
     const rec = { ...form, email: form.email.trim().toLowerCase(), hash: pwHash(form.email.trim(), form.pass), createdAt: Date.now(), lastSignIn: Date.now(), device: (typeof CTX !== 'undefined' ? CTX.dv + ' · ' + CTX.br : ''), status: 'active' };
     delete rec.pass; delete rec.confirm; delete rec.identifier;
-    store.accounts.push(rec); saveAccounts();
+    store.accounts.push(rec); saveAccounts(); cloudPut('accounts', rec);
     store.sessionEmail = rec.email; emit();
     return rec;
   },
@@ -385,14 +474,14 @@ const NasanStore = {
     if (!a) return;
     const p = { ...patch }; delete p.pass; delete p.confirm; delete p.identifier;
     if (p.email) p.email = p.email.trim().toLowerCase();
-    Object.assign(a, p); saveAccounts();
+    Object.assign(a, p); saveAccounts(); cloudPut('accounts', a);
     if (p.email) store.sessionEmail = p.email;
     emit();
   },
   startSession(acc) {
     if (acc && acc.status === 'suspended') return false;
     const rec = store.accounts.find(x => x.email === acc.email);
-    if (rec) { rec.lastSignIn = Date.now(); rec.signIns = (rec.signIns || 0) + 1; saveAccounts(); }
+    if (rec) { rec.lastSignIn = Date.now(); rec.signIns = (rec.signIns || 0) + 1; saveAccounts(); cloudPut('accounts', rec); }
     store.sessionEmail = acc.email;
     Object.assign(store.account, { ...acc, pass: '', confirm: '', identifier: '' });
     delete store.account.hash;
@@ -422,14 +511,17 @@ const NasanStore = {
     o.status = status;
     o.past = status === 'Picked up' || status === 'Collected' || status === 'Cancelled';
     o.updatedAt = Date.now();
-    saveOrders(); emit();
+    try { localStorage.setItem(ORD_KEY, JSON.stringify(store.orders)); } catch (e) {}
+    cloudPut('orders', o); emit();
   },
   addOrder(order) {
     const owner = currentOwner();
     if (!owner) return false;
     let id = order.id;
     while (store.orders.some(x => x.id === id)) id = '#' + (1802 + Math.floor(Math.random() * 8000));
-    store.orders.unshift({ ...order, id, owner, customer: [store.account.first, store.account.last].filter(Boolean).join(' ') || order.customer });
+    const rec = { ...order, id, owner, createdAt: Date.now(), customer: [store.account.first, store.account.last].filter(Boolean).join(' ') || order.customer };
+    store.orders.unshift(rec);
+    cloudPut('orders', rec); followOwnOrders();
     cloudEvent({ t: Date.now(), d: deviceId, s: 'order', x: id, lang: store.lang || 0 });
     saveTraffic();
     saveOrders(); emit();
@@ -476,6 +568,28 @@ const NasanStore = {
   },
   resetSettings() { store.settings = merge(DEFAULT_SETTINGS, {}); saveSettings(); emit(); },
   clearErrors() { store.errors = []; try { localStorage.setItem(ERR_KEY, '[]'); } catch (e) {} emit(); },
+  /* Admin sign-in through Firebase Auth. Resolves { ok, err }. */
+  adminCloud() { return !!cloudAuth; },
+  isCloudAdmin() { return store.cloudAdmin; },
+  adminSignIn(email, pass) {
+    if (!cloudAuth) return Promise.resolve({ ok: false, err: 'offline' });
+    return cloudAuth.signInWithEmailAndPassword(email, pass).then(c => {
+      if (!c.user || c.user.uid !== ADMIN_UID()) { cloudAuth.signOut(); return { ok: false, err: 'This account is not the nasan admin' }; }
+      store.cloudAdmin = true; startAdminListeners(); emit();
+      return { ok: true };
+    }).catch(e => {
+      const c = (e && e.code) || '';
+      const msg = /too-many/.test(c) ? 'Too many tries. Wait a few minutes.'
+        : /network/.test(c) ? 'No internet connection'
+        : 'Wrong email or password';
+      return { ok: false, err: msg };
+    });
+  },
+  adminSignOut() { store.cloudAdmin = false; if (cloudAuth) cloudAuth.signOut(); emit(); },
+  adminReset(email) {
+    if (!cloudAuth) return Promise.resolve(false);
+    return cloudAuth.sendPasswordResetEmail(email).then(() => true).catch(() => false);
+  },
   myOrders() { const o = currentOwner(); return o ? store.orders.filter(x => x.owner === o) : []; },
 };
 

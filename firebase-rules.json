@@ -3,13 +3,48 @@
     ".read": false,
     ".write": false,
     "nasan": {
-      ".read": true,
-      "products":     { ".write": true },
-      "orders":       { ".write": true },
-      "accounts":     { ".write": true },
-      "settings":     { ".write": true },
-      "translations": { ".write": true },
-      "traffic":      { ".write": true, ".indexOn": ["t"] }
+      "products": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'"
+      },
+      "settings": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'"
+      },
+      "translations": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'"
+      },
+      "admin": {
+        ".read": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'"
+      },
+      "orders": {
+        ".read": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        "$k": {
+          ".read": true,
+          ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2' || (!data.exists() && newData.exists()) || (data.exists() && newData.exists() && newData.child('status').val() === 'Cancelled' && data.child('owner').val() === newData.child('owner').val() && data.child('status').val() !== 'Picked up')"
+        }
+      },
+      "accounts": {
+        ".read": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        "$k": {
+          ".read": true,
+          ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2' || (!data.exists() && newData.exists()) || (data.exists() && newData.exists() && data.child('hash').val() === newData.child('hash').val())"
+        }
+      },
+      "traffic": {
+        ".read": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        ".indexOn": [
+          "t"
+        ],
+        "$k": {
+          ".write": "!data.exists() && newData.exists()"
+        }
+      }
     }
   }
 }

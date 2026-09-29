@@ -1,0 +1,15 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "nasan": {
+      ".read": true,
+      "products":     { ".write": true },
+      "orders":       { ".write": true },
+      "accounts":     { ".write": true },
+      "settings":     { ".write": true },
+      "translations": { ".write": true },
+      "traffic":      { ".write": true, ".indexOn": ["t"] }
+    }
+  }
+}

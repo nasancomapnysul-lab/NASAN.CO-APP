@@ -117,6 +117,7 @@ const STR = {
   locationDenied: ['Permission denied — enter the address manually', 'ڕێگە نەدرا — ناونیشان بە دەست بنووسە', 'تم رفض الإذن — أدخل العنوان يدوياً'],
   required: ['Please fill in all required fields', 'تکایە هەموو خانە پێویستەکان پڕبکەرەوە', 'يرجى ملء جميع الحقول المطلوبة'],
   passMismatch: ['Passwords do not match', 'وشە نهێنییەکان وەک یەک نین', 'كلمتا المرور غير متطابقتين'],
+  accSuspended: ['This account is suspended. Please contact nasan Company.', 'ئەم هەژمارە ڕاگیراوە. تکایە پەیوەندی بە کۆمپانیای نەسەن بکە.', 'هذا الحساب موقوف. يرجى التواصل مع شركة نسان.'],
   passShort: ['Password must be at least 8 characters', 'وشەی نهێنی دەبێت لانیکەم ٨ پیت بێت', 'يجب أن تكون كلمة المرور ٨ أحرف على الأقل'],
   accountCreated: ['Account created', 'هەژمار دروستکرا', 'تم إنشاء الحساب'],
   signedIn: ['Signed in', 'چوویتە ژوورەوە', 'تم تسجيل الدخول'],
@@ -137,7 +138,15 @@ const STR = {
   phoneTaken: ['This number is already registered', 'ئەم ژمارەیە پێشتر تۆمارکراوە', 'هذا الرقم مسجل مسبقاً'],
   emailOtpSentTo: ['We sent a 6-digit code to', 'کۆدێکی ٦ ژمارەییمان نارد بۆ', 'أرسلنا رمزاً من ٦ أرقام إلى'],
   verifyEmailFirst: ['Verify your email with the code we sent.', 'ئیمەیڵەکەت بە کۆدی نێردراو پشتڕاست بکەرەوە.', 'تحقق من بريدك بالرمز المرسل.'],
-  demoAccount: ['Test account: demo@nasan.company · nasan2026', 'هەژماری تاقیکردنەوە: demo@nasan.company · nasan2026', 'حساب تجريبي: demo@nasan.company · nasan2026'],
+  gateTitle: ['Create an account first', 'سەرەتا هەژمارێک دروست بکە', 'أنشئ حساباً أولاً'],
+  gateBody: ['You need an account to place orders. Once created, it stays signed in on this phone.', 'بۆ داواکاری پێویستت بە هەژمارە. دوای دروستکردن، لەسەر ئەم مۆبایلە دەمێنێتەوە.', 'تحتاج إلى حساب لتقديم الطلبات. بعد إنشائه يبقى مسجلاً على هذا الهاتف.'],
+  gateCreate: ['Create account', 'دروستکردنی هەژمار', 'إنشاء حساب'],
+  gateSignIn: ['I already have an account', 'هەژمارم هەیە', 'لدي حساب بالفعل'],
+  notNow: ['Not now', 'ئێستا نا', 'ليس الآن'],
+  noOrdersTitle: ['No orders yet', 'هێشتا داواکاری نییە', 'لا توجد طلبات بعد'],
+  noOrdersBody: ['Orders you place will show up here with live status.', 'داواکارییەکانت لێرە بە دۆخی ڕاستەوخۆ دەردەکەون.', 'ستظهر طلباتك هنا مع حالتها المباشرة.'],
+  noPastBody: ['Finished and cancelled orders will be kept here.', 'داواکارییە تەواوبوو و هەڵوەشاوەکان لێرە دەمێننەوە.', 'ستبقى الطلبات المكتملة والملغاة هنا.'],
+  ordersSignedOut: ['Sign in to see your orders', 'بچۆ ژوورەوە بۆ بینینی داواکارییەکانت', 'سجّل الدخول لرؤية طلباتك'],
 
   /* orders */
   active: ['Active', 'چالاک', 'نشطة'],
@@ -370,7 +379,16 @@ function todayHoursLine(li) {
 
 const LangCtx = React.createContext(0);
 function useLang() { return React.useContext(LangCtx); }
+function nsSet(section, key, fallback) {
+  const st = window.NasanStore && window.NasanStore.get();
+  const v = st && st.settings && st.settings[section] ? st.settings[section][key] : undefined;
+  return v === undefined || v === '' ? fallback : v;
+}
+window.NASAN_STR = STR;
 function tr(key, li) {
+  const ov = window.NasanStore && window.NasanStore.get().trOverrides;
+  const hit = ov && ov[li || 0] && ov[li || 0][key];
+  if (hit) return hit;
   const row = STR[key];
   if (!row) return key;
   return row[li] || row[0] || key;
@@ -401,8 +419,8 @@ function nsLang() {
 }
 
 const T = {
-  teal: '#3FB2BD',
-  tealDeep: '#2C8F99',
+  get teal() { return nsSet('design', 'accent', '#3FB2BD'); },
+  get tealDeep() { return nsSet('design', 'accentDeep', '#2C8F99'); },
   ink: '#20262A',
   ink70: 'rgba(32,38,42,0.66)',
   ink45: 'rgba(32,38,42,0.45)',
@@ -707,6 +725,7 @@ const BRANDS = ['YAXUN', 'RF4', 'SUNSHINE', 'AIXUN', 'QUICK', 'YIHUA', 'RELIFE',
 function NasanHomeEditorial({ bare, onMenu, onNav, cartCount , onLang } = {}) {
   const D = frame(bare, 'ios');
   const li = useLang();
+  const heroP = liveCatalog().find(x => x[4] === nsSet('hero', 'code', '1402')) || ['SUGON 3010PM', '30V 10A supply', 'Sugon', 'Power', '1402', 'supply'];
   /* One card per category, each from a different brand where the catalog allows it.
      Reordering alone was not enough: picking the first product of each category made
      the pool 4/5 one brand (YAXUN leads four categories), so the run of duplicates
@@ -796,8 +815,8 @@ function NasanHomeEditorial({ bare, onMenu, onNav, cartCount , onLang } = {}) {
           }}>
             <div style={{ flex: 1 }}>
               <div style={{ font: `600 11px/1 ${T.sans}`, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.teal }}>{tr('newArrival', li)}</div>
-              <div style={{ margin: '10px 0 0', font: `700 25px/1.12 ${T.sans}`, letterSpacing: '-0.025em', color: '#fff' }}>SUGON 3010PM<br />{localSub('30V 10A supply', li)}</div>
-              <div onClick={() => onNav && onNav('product:1402')} style={{ marginTop: 16, display: 'inline-flex', padding: '9px 17px', borderRadius: 100, background: T.teal, font: `600 13.5px/1 ${T.sans}`, color: '#0E2124', cursor: 'pointer' , ...pressStyle }} {...press(0.975)}>{tr('viewProduct', li)}</div>
+              <div style={{ margin: '10px 0 0', font: `700 25px/1.12 ${T.sans}`, letterSpacing: '-0.025em', color: '#fff' }}>{heroP[0]}<br />{localSub(heroP[1], li)}</div>
+              <div onClick={() => onNav && onNav('product:' + heroP[4])} style={{ marginTop: 16, display: 'inline-flex', padding: '9px 17px', borderRadius: 100, background: T.teal, font: `600 13.5px/1 ${T.sans}`, color: '#0E2124', cursor: 'pointer' , ...pressStyle }} {...press(0.975)}>{tr('viewProduct', li)}</div>
             </div>
             <ToolShot w={86} kind="supply" dark />
           </div>
@@ -980,6 +999,7 @@ function NasanHomeDark({ bare, onMenu, onNav, onBack, onAdd, cartCount, code, on
 function NasanHomeAndroid({ bare, onMenu, onNav, cartCount , onLang } = {}) {
   const D = frame(bare, 'android');
   const li = useLang();
+  const heroP = liveCatalog().find(x => x[4] === nsSet('hero', 'code', '1402')) || ['SUGON 3010PM', '30V 10A supply', 'Sugon', 'Power', '1402', 'supply'];
   return (
     <D>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: T.paper, fontFamily: T.roboto, position: 'relative' }}>
@@ -1007,8 +1027,8 @@ function NasanHomeAndroid({ bare, onMenu, onNav, cartCount , onLang } = {}) {
           }}>
             <div style={{ flex: 1 }}>
               <div style={{ font: `500 11px/1 ${T.roboto}`, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.teal }}>{tr('newArrival', li)}</div>
-              <div style={{ margin: '10px 0 0', font: `400 24px/1.15 ${T.roboto}`, color: '#fff' }}>SUGON 3010PM<br />{localSub('30V 10A supply', li)}</div>
-              <div onClick={() => onNav && onNav('product:1402')} style={{ marginTop: 16, display: 'inline-flex', padding: '10px 20px', borderRadius: 100, background: T.teal, font: `500 14px/1 ${T.roboto}`, color: '#0E2124', cursor: 'pointer' , ...pressStyle }} {...press(0.975)}>{tr('viewProduct', li)}</div>
+              <div style={{ margin: '10px 0 0', font: `400 24px/1.15 ${T.roboto}`, color: '#fff' }}>{heroP[0]}<br />{localSub(heroP[1], li)}</div>
+              <div onClick={() => onNav && onNav('product:' + heroP[4])} style={{ marginTop: 16, display: 'inline-flex', padding: '10px 20px', borderRadius: 100, background: T.teal, font: `500 14px/1 ${T.roboto}`, color: '#0E2124', cursor: 'pointer' , ...pressStyle }} {...press(0.975)}>{tr('viewProduct', li)}</div>
             </div>
             <ToolShot w={80} kind="supply" dark />
           </div>
@@ -1426,7 +1446,7 @@ function NasanMenu({ bare, onClose, onNav } = {}) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 7, marginTop: 12 }}>
               {SOCIALS.map(([name, href, fill, d, short], si) => (
-                <a key={name} href={href} target="_blank" rel="noopener noreferrer" title={name} {...press(0.9)} style={{
+                <a key={name} href={nsSet('social', name, href)} target="_blank" rel="noopener noreferrer" title={name} {...press(0.9)} style={{
                   ...pressStyle, borderRadius: 10, textDecoration: 'none', padding: '9px 0 7px',
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
@@ -1556,7 +1576,7 @@ function NasanContact({ bare, onBack, onNav, onLang } = {}) {
   const hrs = todayHoursLine(li);
   const closedToday = hrs.closed, todayOpen = hrs.open, todayHours = hrs.label;
   const rows = [
-    ['WhatsApp', '+964 770 414 9292', tr('msgInstantly', li), 'M4 5h16v12H8l-4 4V5z', 'https://wa.me/9647704149292'],
+    ['WhatsApp', '+964 770 414 9292', tr('msgInstantly', li), 'M4 5h16v12H8l-4 4V5z', '' + 'https://wa.me/' + nsSet('general', 'whatsapp', '9647704149292') + ''],
     ['Google Maps', tr('findUs', li), tr('shopName1', li) + (li ? '، ' : ', ') + tr('sulay', li), 'M12 21s7-6.1 7-11a7 7 0 10-14 0c0 4.9 7 11 7 11z', 'https://google.com/maps/place/HC4V%2BC4R+%D9%BE%D8%B4%D8%AA%D9%89+%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1%D9%89+%D8%AC%D9%87+%D9%88%D8%A7%D8%B2%D9%87+%D9%83%D9%87+(NASAN),+Sulaymaniyah'],
   ];
   const [waOpen, setWaOpen] = React.useState(false);
@@ -1605,7 +1625,7 @@ function NasanContact({ bare, onBack, onNav, onLang } = {}) {
             <div style={{ font: `600 16px/1.2 ${T.sans}`, color: T.ink }}>{tr('readyStock', li)}</div>
             <div style={{ marginTop: 6, font: `400 13.5px/1.5 ${T.sans}`, color: T.ink70 }}>{tr('readyStockLead', li)}</div>
             <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
-              <a href="https://wa.me/9647704149292" target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 100, background: T.teal, font: `600 13.5px/1 ${T.sans}`, color: '#0E2124', textDecoration: 'none' }}>WhatsApp</a>
+              <a href={'https://wa.me/' + nsSet('general', 'whatsapp', '9647704149292')} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 100, background: T.teal, font: `600 13.5px/1 ${T.sans}`, color: '#0E2124', textDecoration: 'none' }}>WhatsApp</a>
               <div onClick={() => onNav && onNav('cat:All')} style={{ flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 100, border: `1px solid ${T.line}`, font: `600 13.5px/1 ${T.sans}`, color: T.ink, cursor: 'pointer' , ...pressStyle }} {...press(0.975)}>{tr('browseProducts', li)}</div>
             </div>
           </div>
@@ -2517,7 +2537,7 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
     setLeaving(id); setConfirmCancel(null); setAsked(null);
     setTimeout(() => { window.NasanStore && window.NasanStore.setOrderStatus(id, 'Cancelled'); setLeaving(null); }, 320);
   };
-  const WA = 'https://wa.me/9647704149292?text=';
+  const WA = '' + 'https://wa.me/' + nsSet('general', 'whatsapp', '9647704149292') + '?text=';
   const st = window.useNasanStore ? window.useNasanStore() : { orders: [] };
   const STEP = { Waiting: 0, Received: 1, Preparing: 2, Ready: 3, 'Picked up': 4, Collected: 4 };
   const localItems = (n) => n + ' ' + tr(n === 1 ? 'item' : 'items', li);
@@ -2525,12 +2545,14 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
     Waiting: tr('waiting', li), Received: tr('received', li), Preparing: tr('preparing', li),
     Ready: tr('readyPickup', li), 'Picked up': tr('pickedUp', li), Collected: tr('pickedUp', li),
   };
-  const active = st.orders.filter(o => !o.past)
+  const mine = window.NasanStore ? window.NasanStore.myOrders() : [];
+  const signedOut = !st.signedIn;
+  const active = mine.filter(o => !o.past)
     .map(o => [o.id, LABEL[o.status] || o.status,
       o.summary.replace(/(\d+) items?$/, (m, n) => localItems(Number(n))),
       localWhen(o.when, li),
       STEP[o.status] ?? 0, o.updatedAt]);
-  const past = st.orders.filter(o => o.past)
+  const past = mine.filter(o => o.past)
     .map(o => [o.id, o.summary.replace(/(\d+) items?$/, (m, n) => localItems(Number(n))), localWhen(o.when, li), o.shop || 'Barzar Jawazaka', o.status === 'Cancelled']);
   return (
     <D>
@@ -2549,7 +2571,19 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
 
           {tab === 'Active' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 20px 26px' }}>
-              {active.map(([id, status, items, when, step, updatedAt], oi) => (
+{(signedOut || !active.length) && (
+                <div style={{ padding: '44px 20px', textAlign: 'center', animation: 'nsCardIn .4s cubic-bezier(.2,.8,.25,1) both' }}>
+                  <div style={{ width: 64, height: 64, margin: '0 auto', borderRadius: 20, background: T.white, border: `1px solid ${T.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={T.ink45} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16v14H4zM8 3v5M16 3v5M8 13h8M8 16.5h5" /></svg>
+                  </div>
+                  <div style={{ marginTop: 16, font: `700 18px/1.2 ${T.sans}`, letterSpacing: '-0.02em', color: T.ink }}>{tr(signedOut ? 'ordersSignedOut' : 'noOrdersTitle', li)}</div>
+                  <div style={{ marginTop: 7, font: `400 13.5px/1.55 ${T.sans}`, color: T.ink70 }}>{tr(signedOut ? 'gateBody' : 'noOrdersBody', li)}</div>
+                  <div onClick={() => onNav && onNav(signedOut ? 'You' : 'Shop')} {...press(0.975)} style={{ ...pressStyle, marginTop: 18, display: 'inline-flex', padding: '12px 22px', borderRadius: 100, background: T.ink, font: `600 13.5px/1 ${T.sans}`, color: '#fff', cursor: 'pointer' }}>
+                    {tr(signedOut ? 'gateCreate' : 'browseProducts', li)}
+                  </div>
+                </div>
+              )}
+              {!signedOut && active.map(([id, status, items, when, step, updatedAt], oi) => (
                 <div key={id} style={{ padding: 16, borderRadius: 18, background: T.white, border: `1px solid ${T.line}`, animation: leaving === id ? 'nsCardOut .32s cubic-bezier(.5,0,.75,0) both' : 'nsCardIn .32s cubic-bezier(.2,.8,.25,1) both', animationDelay: leaving === id ? '0s' : (oi * 0.06) + 's' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ font: `700 15px/1 ${T.sans}`, color: T.ink }}>{id}</span>
@@ -2592,7 +2626,7 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
                       <div style={{ font: `500 10.5px/1 ${T.sans}`, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.ink45 }}>Message about {id}</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 11 }}>
                         {['Is it ready for pickup?', 'Can I change the quantity?', 'Ask for the price'].map(q => (
-                          <a key={q} href={'https://wa.me/9647704149292?text=' + encodeURIComponent(tr('waOrderMsg', li) + ' ' + id + ': ' + q)}
+                          <a key={q} href={'' + 'https://wa.me/' + nsSet('general', 'whatsapp', '9647704149292') + '?text=' + encodeURIComponent(tr('waOrderMsg', li) + ' ' + id + ': ' + q)}
                             target="_blank" rel="noopener noreferrer"
                             style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px', borderRadius: 11, background: T.white, border: `1px solid ${T.line}`, font: `500 13px/1.3 ${T.sans}`, color: T.ink, cursor: 'pointer', textDecoration: 'none' }}>
                             <span style={{ flex: 1 }}>{q}</span>
@@ -2600,7 +2634,7 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
                           </a>
                         ))}
                       </div>
-                      <a href={'https://wa.me/9647704149292?text=' + encodeURIComponent(tr('waOrderMsg', li) + ' ' + id)}
+                      <a href={'' + 'https://wa.me/' + nsSet('general', 'whatsapp', '9647704149292') + '?text=' + encodeURIComponent(tr('waOrderMsg', li) + ' ' + id)}
                         target="_blank" rel="noopener noreferrer"
                         style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '12px 0', borderRadius: 100, background: T.teal, font: `700 13.5px/1 ${T.sans}`, color: '#0E2124', cursor: 'pointer', textDecoration: 'none' }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0E2124" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v12H8l-4 4V5z" /></svg>
@@ -2633,7 +2667,19 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
 
           {tab === 'Past' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 20px 26px' }}>
-              {past.map(([id, items, when, shop, isCancelled]) => {
+{(signedOut || !past.length) && (
+                <div style={{ padding: '44px 20px', textAlign: 'center', animation: 'nsCardIn .4s cubic-bezier(.2,.8,.25,1) both' }}>
+                  <div style={{ width: 64, height: 64, margin: '0 auto', borderRadius: 20, background: T.white, border: `1px solid ${T.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={T.ink45} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16v14H4zM8 3v5M16 3v5M8 13h8M8 16.5h5" /></svg>
+                  </div>
+                  <div style={{ marginTop: 16, font: `700 18px/1.2 ${T.sans}`, letterSpacing: '-0.02em', color: T.ink }}>{tr(signedOut ? 'ordersSignedOut' : 'noOrdersTitle', li)}</div>
+                  <div style={{ marginTop: 7, font: `400 13.5px/1.55 ${T.sans}`, color: T.ink70 }}>{tr(signedOut ? 'gateBody' : 'noPastBody', li)}</div>
+                  <div onClick={() => onNav && onNav(signedOut ? 'You' : 'Shop')} {...press(0.975)} style={{ ...pressStyle, marginTop: 18, display: 'inline-flex', padding: '12px 22px', borderRadius: 100, background: T.ink, font: `600 13.5px/1 ${T.sans}`, color: '#fff', cursor: 'pointer' }}>
+                    {tr(signedOut ? 'gateCreate' : 'browseProducts', li)}
+                  </div>
+                </div>
+              )}
+              {!signedOut && past.map(([id, items, when, shop, isCancelled]) => {
                 const isOpen = open === id;
                 return (
                   <div key={id} onClick={() => setOpen(isOpen ? null : id)} style={{
@@ -2680,8 +2726,20 @@ function NasanOrders({ bare, onMenu, onNav, cartCount , onLang } = {}) {
 function NasanAccount({ bare, onMenu, onNav, cartCount, onLang } = {}) {
   const D = frame(bare, 'ios');
   const li = useLang();
-  const [mode, setMode] = React.useState('in');
+  const [mode, setMode] = React.useState(() => {
+    const want = window.__nasanAuthMode; window.__nasanAuthMode = null;
+    if (want) return want;
+    const st0 = window.NasanStore && window.NasanStore.get();
+    return st0 && st0.accounts && st0.accounts.length ? 'in' : 'up';
+  });
   const store = window.useNasanStore ? window.useNasanStore() : { account: {}, signedIn: false };
+  React.useEffect(() => {
+    if (store.signedIn && window.__nasanReturnToCart) {
+      window.__nasanReturnToCart = false;
+      const id = setTimeout(() => onNav && onNav('Cart'), 700);
+      return () => clearTimeout(id);
+    }
+  }, [store.signedIn]);
   const form = store.account || {};
   const setForm = (fn) => {
     const next = typeof fn === 'function' ? fn(form) : fn;
@@ -2758,7 +2816,8 @@ function NasanAccount({ bare, onMenu, onNav, cartCount, onLang } = {}) {
     const rec = NSx.get().accounts.find(a => a.email === se);
     return !!rec && rec.phoneVerified && (rec.phone || '').replace(/\D/g, '') === (form.phone || '').replace(/\D/g, '');
   })();
-  const phoneOk = (!!verifiedPhone && verifiedPhone === form.phone) || phoneOnRecord;
+  /* No SMS code: a full 10-digit Iraqi mobile number is enough. */
+  const phoneOk = phoneDigits.length === 10 && /^7/.test(phoneDigits);
   React.useEffect(() => {
     if (!otp.left) return;
     const id = setTimeout(() => setOtp(o => ({ ...o, left: Math.max(0, o.left - 1) })), 1000);
@@ -2967,52 +3026,17 @@ function NasanAccount({ bare, onMenu, onNav, cartCount, onLang } = {}) {
             const digits = e.target.value.replace(/\D/g, '').replace(/^964/, '').replace(/^0/, '').slice(0, 10);
             const g = digits.replace(/(\d{3})(\d{0,3})(\d{0,4})/, (m, a, b, c) => [a, b, c].filter(Boolean).join(' '));
             setForm(f => ({ ...f, phone: g }));
-            if (otp.sent) setOtp({ sent: false, code: '', entry: '', left: 0, err: '' });
           }}
           placeholder="770 123 4567"
           style={{ flex: 1, minWidth: 0, height: '100%', border: 'none', outline: 'none', background: 'transparent', padding: '0 14px', font: `400 15px/1 ${T.sans}`, color: T.ink }} />
-        {phoneOk ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 12px', flex: 'none', font: `600 12px/1 ${T.sans}`, color: T.tealDeep }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.tealDeep} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
-            {tr('phoneVerified', li)}
+        {phoneOk && (
+          <span style={{ display: 'flex', alignItems: 'center', padding: '0 14px', flex: 'none' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.tealDeep} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
           </span>
-        ) : (
-          <span onClick={otp.left ? undefined : sendOtp} {...press(0.95)} style={{
-            ...pressStyle, flex: 'none', margin: 5, padding: '0 12px', height: 'calc(100% - 10px)',
-            display: 'flex', alignItems: 'center', borderRadius: 9,
-            background: otp.left ? 'rgba(32,38,42,0.06)' : T.ink, color: otp.left ? T.ink45 : '#fff',
-            font: `600 12.5px/1 ${T.sans}`, cursor: otp.left ? 'default' : 'pointer', whiteSpace: 'nowrap',
-          }}>{otp.left ? otp.left + 's' : otp.sent ? tr('resend', li) : tr('sendOtp', li)}</span>
         )}
       </div>
       {!phoneOk && phoneTaken && statusLine({ tone: 'bad', msg: tr('phoneTaken', li) })}
       {!phoneOk && !phoneTaken && phoneDigits.length > 0 && phoneDigits.length < 10 && statusLine({ tone: 'bad', msg: tr('idFullPhone', li) })}
-      {!phoneOk && otp.err && !otp.sent && !phoneTaken && (
-        <div style={{ marginTop: 8, font: `500 12.5px/1.4 ${T.sans}`, color: '#C0392B' }}>{otp.err}</div>
-      )}
-      {!phoneOk && otp.sent && (
-        <div style={{ marginTop: 10, padding: 14, borderRadius: 14, background: T.white, border: `1px solid rgba(63,178,189,0.45)`, animation: 'nsRiseIn .28s cubic-bezier(.2,.8,.25,1) both' }}>
-          <div style={{ font: `600 13.5px/1.2 ${T.sans}`, color: T.ink }}>{tr('otpTitle', li)}</div>
-          <div style={{ marginTop: 4, font: `400 12.5px/1.4 ${T.sans}`, color: T.ink70 }}>{tr('otpSentTo', li)} <span dir="ltr">+964 {form.phone}</span></div>
-          <div dir="ltr" style={{ position: 'relative', marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 7 }}>
-            {[0, 1, 2, 3, 4, 5].map(i => (
-              <div key={i} style={{
-                height: 46, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(32,38,42,0.04)',
-                border: `1.5px solid ${otp.err ? '#B4443A' : i === otp.entry.length ? T.teal : T.line}`,
-                font: `700 20px/1 ${T.sans}`, color: T.ink, transition: 'border-color .15s',
-              }}>{otp.entry[i] || ''}</div>
-            ))}
-            <input value={otp.entry} autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6}
-              onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); setOtp(o => ({ ...o, entry: v, err: '' })); if (v.length === 6) setTimeout(() => checkOtp(v), 120); }}
-              style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', border: 'none', fontSize: 16, cursor: 'text' }} />
-          </div>
-          {otp.err && <div style={{ marginTop: 9, font: `500 12.5px/1.4 ${T.sans}`, color: '#B4443A' }}>{otp.err}</div>}
-          <div style={{ marginTop: 10, padding: '9px 11px', borderRadius: 9, background: 'rgba(63,178,189,0.10)', font: `400 12px/1.45 ${T.sans}`, color: T.tealDeep }}>
-            {tr('otpDemo', li)} <b dir="ltr" style={{ letterSpacing: '0.12em' }}>{otp.code}</b>
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -3056,7 +3080,7 @@ function NasanAccount({ bare, onMenu, onNav, cartCount, onLang } = {}) {
       if (emailStatus.tone === 'bad') return setErr(emailStatus.msg);
       if (!emailOk) return setErr(tr('verifyEmailFirst', li));
       if (phoneTaken) return setErr(tr('phoneTaken', li));
-      if (!phoneOk) return setErr(tr('verifyPhoneFirst', li));
+      if (!phoneOk) return setErr(tr('idFullPhone', li));
       if (!form.photo) return setErr(tr('photoRequired', li));
       if (hasShop && (!form.shop || !form.city)) return setErr(tr('required', li));
       if (NS) {
@@ -3072,13 +3096,13 @@ function NasanAccount({ bare, onMenu, onNav, cartCount, onLang } = {}) {
       if (emailStatus.tone === 'bad') return setErr(emailStatus.msg);
       if (!emailOk) return setErr(tr('verifyEmailFirst', li));
       if (phoneTaken) return setErr(tr('phoneTaken', li));
-      if (!phoneOk) return setErr(tr('verifyPhoneFirst', li));
+      if (!phoneOk) return setErr(tr('idFullPhone', li));
       if (!form.photo) return setErr(tr('photoRequired', li));
       if (form.pass.length < 8) return setErr(tr('passShort', li));
       if (form.pass !== form.confirm) return setErr(tr('passMismatch', li));
       if (hasShop && (!form.shop || !form.city)) return setErr(tr('required', li));
       if (!NS) return;
-      const rec = NS.registerAccount({ ...form, email: emailNorm, phoneVerified: true, emailVerified: true });
+      const rec = NS.registerAccount({ ...form, email: emailNorm, phoneVerified: true, emailVerified: true, hasShop: !!hasShop, lat: coords ? coords.lat : '', lng: coords ? coords.lng : '', locShared: !!(locOn && coords), lang: li });
       NS.startSession(rec);
       return;
     }
@@ -3089,6 +3113,7 @@ function NasanAccount({ bare, onMenu, onNav, cartCount, onLang } = {}) {
     const acc = NS && NS.findAccount(form.identifier);
     if (!acc) return setErr(tr('noAccEmail', li));
     if (!NS.checkPassword(acc, form.pass)) return setErr(tr('wrongPass', li));
+    if (acc.status === 'suspended') return setErr(tr('accSuspended', li));
     NS.startSession(acc);
   };
 
@@ -3288,7 +3313,6 @@ function NasanAccount({ bare, onMenu, onNav, cartCount, onLang } = {}) {
                 </div>
                 <div onClick={() => setMode('forgot')} style={{ marginTop: 12, textAlign: 'right', font: `600 12.5px/1 ${T.sans}`, color: T.teal, cursor: 'pointer' }}>{tr('forgotPassword', li)}</div>
                 <div style={{ marginTop: 18, textAlign: 'center', padding: '15px 0', borderRadius: 100, background: T.ink, font: `600 15px/1 ${T.sans}`, color: '#fff', cursor: 'pointer', ...pressStyle }} {...press(0.975)} onClick={submit}>{tr('signIn', li)}</div>
-                <div dir="ltr" style={{ marginTop: 12, textAlign: 'center', font: `400 11.5px/1.4 ${T.sans}`, color: T.ink45 }}>{tr('demoAccount', li)}</div>
               </div>
             )}
 
@@ -3506,20 +3530,24 @@ function NasanCart({ bare, onBack, onNav, items = [], onQty, cartCount, onLang, 
   const [waOpen, setWaOpen] = React.useState(false);
   const cartMsg = tr('waPriceMsg', li) + '\n' + items.map(it => '· ' + it[0] + ' ' + it[2] + ' × ' + it[4]).join('\n');
   const placingRef = React.useRef(false);
+  const [gate, setGate] = React.useState(false);
   const placeOrder = () => {
     if (!items.length || placingRef.current) return;
+    const NS = window.NasanStore;
+    if (!NS || !NS.get().signedIn) { setGate(true); return; }
     placingRef.current = true;
     const count = items.reduce((n, it) => n + it[4], 0);
     const lines = items.map(it => it[0] + ' × ' + it[4]);
     const id = '#' + (1802 + Math.floor(Math.random() * 90));
+    let newId = id;
     if (window.NasanStore) {
-      window.NasanStore.addOrder({
+      newId = window.NasanStore.addOrder({
         id, customer: 'You', items: count,
         summary: items[0][0] + (items.length > 1 ? ' +' + (items.length - 1) + ' more' : '') + ' · ' + count + (count === 1 ? ' item' : ' items'),
         lines, when: 'Just now', status: 'Waiting', past: false, updatedAt: Date.now(),
       });
     }
-    setPlaced(id);
+    setPlaced(newId || id);
     setTimeout(() => {
       if (onNav) onNav('Orders');
       if (onPlaced) onPlaced();
@@ -3602,6 +3630,34 @@ function NasanCart({ bare, onBack, onNav, items = [], onQty, cartCount, onLang, 
         )}
         <TabBar active="Shop" onNav={onNav} />
         {waOpen && <WhatsAppSheet message={cartMsg} onClose={() => setWaOpen(false)} />}
+        {gate && (
+          <div onClick={() => setGate(false)} style={{
+            position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(20,24,26,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+            animation: 'nsFade .18s ease both',
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              width: '100%', maxWidth: 330, padding: '26px 22px 18px', borderRadius: 24, background: T.paper,
+              textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+              animation: 'nsPop .34s cubic-bezier(.2,.8,.25,1) both',
+            }}>
+              <div style={{ width: 56, height: 56, margin: '0 auto', borderRadius: 56, background: 'rgba(63,178,189,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={T.tealDeep} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c1.6-4 14.4-4 16 0" /></svg>
+              </div>
+              <div style={{ marginTop: 16, font: `700 19px/1.2 ${T.sans}`, letterSpacing: '-0.02em', color: T.ink }}>{tr('gateTitle', li)}</div>
+              <div style={{ marginTop: 8, font: `400 13.5px/1.55 ${T.sans}`, color: T.ink70, textWrap: 'pretty' }}>{tr('gateBody', li)}</div>
+              <div onClick={() => { setGate(false); window.__nasanAuthMode = 'up'; window.__nasanReturnToCart = true; onNav && onNav('You'); }} {...press(0.975)} style={{
+                ...pressStyle, marginTop: 20, padding: '14px 0', borderRadius: 100, background: T.ink, cursor: 'pointer',
+                font: `600 14.5px/1 ${T.sans}`, color: '#fff',
+              }}>{tr('gateCreate', li)}</div>
+              <div onClick={() => { setGate(false); window.__nasanAuthMode = 'in'; window.__nasanReturnToCart = true; onNav && onNav('You'); }} {...press(0.975)} style={{
+                ...pressStyle, marginTop: 9, padding: '13px 0', borderRadius: 100, border: `1px solid ${T.line}`, background: T.white, cursor: 'pointer',
+                font: `600 13.5px/1 ${T.sans}`, color: T.ink,
+              }}>{tr('gateSignIn', li)}</div>
+              <div onClick={() => setGate(false)} style={{ marginTop: 12, padding: '6px 0', font: `500 13px/1 ${T.sans}`, color: T.ink45, cursor: 'pointer' }}>{tr('notNow', li)}</div>
+            </div>
+          </div>
+        )}
       </Screen>
     </D>
   );

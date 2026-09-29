@@ -570,6 +570,19 @@ const NasanStore = {
   clearErrors() { store.errors = []; try { localStorage.setItem(ERR_KEY, '[]'); } catch (e) {} emit(); },
   /* Admin sign-in through Firebase Auth. Resolves { ok, err }. */
   adminCloud() { return !!cloudAuth; },
+  /* Re-read everything from Firebase once (Refresh button). */
+  cloudRefresh() {
+    if (!cloudDb) return Promise.resolve(false);
+    const nodes = ['products', 'settings', 'translations'].concat(store.cloudAdmin ? ['orders', 'accounts'] : []);
+    return Promise.all(nodes.map(node => cloudDb.ref('nasan/' + node).once('value').then(snap => {
+      const v = snap.val(); if (v === null) return;
+      if (node === 'orders' || node === 'accounts') {
+        const list = Object.keys(v).map(k => ({ ...v[k], ck: k }));
+        if (node === 'orders') { list.sort((x, y) => (y.createdAt || y.updatedAt || 0) - (x.createdAt || x.updatedAt || 0)); store.orders = list; try { localStorage.setItem(ORD_KEY, JSON.stringify(list)); } catch (e) {} }
+        else { store.accounts = list; try { localStorage.setItem(ACC_KEY, JSON.stringify(list)); } catch (e) {} }
+      } else applyNode(node, v);
+    }).catch(() => {}))).then(() => { emit(); return true; });
+  },
   isCloudAdmin() { return store.cloudAdmin; },
   adminSignIn(email, pass) {
     if (!cloudAuth) return Promise.resolve({ ok: false, err: 'offline' });

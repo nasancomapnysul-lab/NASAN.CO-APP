@@ -211,7 +211,19 @@ function Traffic({ events, products }) {
   const pill = (label, onClick, on) => <span onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '11px 18px', borderRadius: 100, border: '1px solid ' + (on ? C.acc : 'rgba(255,255,255,0.16)'), color: on ? C.acc : C.text, font: `600 13.5px/1 ${A.sans}`, background: 'transparent' }}>{label}</span>;
   const speedTxt = !myLoad ? '—' : myLoad < 1500 ? 'Fast' : myLoad < 3500 ? 'OK' : 'Slow';
   const speedCol = !myLoad ? C.dim : myLoad < 1500 ? C.good : myLoad < 3500 ? '#E0A526' : '#E5534B';
-  const doRefresh = () => { setSpin(true); tick(n => n + 1); try { navigator.storage && navigator.storage.estimate && navigator.storage.estimate().then(setEst); } catch (e) {} setTimeout(() => setSpin(false), 600); };
+  const [lastRef, setLastRef] = React.useState(null);
+  const doRefresh = () => {
+    if (spin) return;
+    setSpin(true);
+    const NS = window.NasanStore;
+    const pull = NS && NS.cloudRefresh ? NS.cloudRefresh() : Promise.resolve();
+    try { navigator.storage && navigator.storage.estimate && navigator.storage.estimate().then(setEst); } catch (e) {}
+    Promise.resolve(pull).catch(() => {}).then(() => {
+      tick(n => n + 1);
+      setLastRef(new Date());
+      setTimeout(() => setSpin(false), 400);
+    });
+  };
 
   return (
     <div style={{ margin: '-20px -26px -30px', padding: '22px 22px 28px', background: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -219,7 +231,8 @@ function Traffic({ events, products }) {
         {ico('M4 19V11M9 19V5M14 19v-6M19 19V8')}
         <span style={{ font: `700 22px/1 ${A.sans}`, letterSpacing: '-0.02em', color: C.text }}>Site Dashboard</span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-          {pill(<><span style={{ display: 'inline-flex', transform: spin ? 'rotate(360deg)' : 'none', transition: 'transform .6s' }}>↻</span> Refresh</>, doRefresh, true)}
+          {lastRef && <span style={{ alignSelf: 'center', font: `400 12.5px/1 ${A.sans}`, color: C.dim }}>Updated {lastRef.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
+          {pill(<><span style={{ display: 'inline-flex', animation: spin ? 'nsSpin .7s linear infinite' : 'none' }}>↻</span> {spin ? 'Refreshing…' : 'Refresh'}</>, doRefresh, true)}
           {pill('← Back to Products', () => window.__nasanAdminTab && window.__nasanAdminTab('Products'))}
         </span>
       </div>
@@ -1377,15 +1390,25 @@ function NasanAdmin() {
   const brandList = Object.keys(brandCount).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
   const list = products.filter(p =>
     (p.name + p.code + p.brand).toLowerCase().includes(query.toLowerCase()));
-  const item = products[sel];
+  const base = products[sel];
+  const [draft, setDraft] = React.useState({});
+  const [draftFor, setDraftFor] = React.useState(null);
+  if (base && draftFor !== base.code) { setDraftFor(base.code); setDraft({}); }
+  const item = base ? { ...base, ...draft } : base;
+  const dirty = Object.keys(draft).some(k => String(draft[k]) !== String(base && base[k]));
 
-  const patch = (key, val) => {
-    const p = products[sel];
-    if (!p || !window.NasanStore) return;
-    window.NasanStore.updateProduct(p.code, { [key]: val });
+  const patch = (key, val) => setDraft(d => ({ ...d, [key]: val }));
+  const saveDraft = () => {
+    if (!base || !dirty || !window.NasanStore) return;
+    const changes = { ...draft };
+    if (changes.stock !== undefined) changes.stock = Number(changes.stock) || 0;
+    window.NasanStore.updateProduct(base.code, changes);
+    setDraft({});
+    if (changes.code) setDraftFor(changes.code);
     setSaved(true);
-    setTimeout(() => setSaved(false), 1200);
+    setTimeout(() => setSaved(false), 1600);
   };
+  const discardDraft = () => setDraft({});
   const addProduct = () => {
     const next = { code: String(1920 + products.length), name: 'New product', sub: 'Describe this product', brand: 'Yaxun', cat: 'Power', kind: 'station', stock: 0, status: 'Draft' };
     window.NasanStore && window.NasanStore.addProduct(next);
@@ -1449,7 +1472,7 @@ function NasanAdmin() {
             setOwnerOpen(false);
           }} />
       )}
-      <style>{'@keyframes nsPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.86)}}@keyframes nsPop{0%{transform:scale(.9)}60%{transform:scale(1.04)}100%{transform:scale(1)}}@keyframes nsRiseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes nsShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}'}</style>
+      <style>{'@keyframes nsSpin{to{transform:rotate(360deg)}}@keyframes nsPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.86)}}@keyframes nsPop{0%{transform:scale(.9)}60%{transform:scale(1.04)}100%{transform:scale(1)}}@keyframes nsRiseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes nsShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}'}</style>
 
       {/* sidebar */}
       <aside style={{ position: 'relative', width: 232, flex: 'none', background: '#141A1C', display: 'flex', flexDirection: 'column' }}>
@@ -1605,9 +1628,17 @@ function NasanAdmin() {
               <Field label="Category" value={item.cat} onChange={v => patch('cat', v)} options={['Power', 'Microscope', 'Soldering', 'Hot air', 'Hand tools']} optionLabel={catLabel} />
               <Field label="Stock" value={item.stock} onChange={v => patch('stock', v)} type="number" />
               <Field label="Status" value={item.status} onChange={v => patch('status', v)} options={['Live', 'Low stock', 'Out of stock', 'Draft']} />
-              <div style={{ marginTop: 20, textAlign: 'center', padding: '13px 0', borderRadius: 100, background: saved ? A.tealDeep : A.ink, color: '#fff', font: `600 13.5px/1 ${A.sans}`, cursor: 'pointer', transition: 'background .25s' }}>
-                {saved ? 'Saved — live in the app' : 'Changes save as you type'}
+              <div onClick={saveDraft} style={{
+                marginTop: 20, textAlign: 'center', padding: '13px 0', borderRadius: 100,
+                background: saved ? A.tealDeep : dirty ? A.ink : 'rgba(32,38,42,0.12)',
+                color: saved || dirty ? '#fff' : 'rgba(32,38,42,0.45)',
+                font: `600 13.5px/1 ${A.sans}`, cursor: dirty ? 'pointer' : 'default', transition: 'background .25s, color .25s',
+              }}>
+                {saved ? 'Saved — live in the app' : dirty ? 'Save changes' : 'No changes'}
               </div>
+              {dirty && !saved && (
+                <div onClick={discardDraft} style={{ marginTop: 8, textAlign: 'center', font: `500 12.5px/1 ${A.sans}`, color: A.ink70, cursor: 'pointer', padding: '8px 0' }}>Discard changes</div>
+              )}
               <div onClick={removeProduct} style={{ marginTop: 10, textAlign: 'center', font: `500 12.5px/1 ${A.sans}`, color: '#B4443A', cursor: 'pointer', padding: '10px 0' }}>Delete product</div>
             </aside>
           )}

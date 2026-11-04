@@ -25,27 +25,48 @@
 <meta name="apple-mobile-web-app-title" content="nasan">
 <title>nasan Company</title>
 <link rel="icon" href="nasan-logo.png">
-<link rel="apple-touch-icon" href="nasan-logo.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   html,body{margin:0;height:100%;background:#121618;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
-  #root{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;box-sizing:border-box;
-    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  /* phones: the app fills the whole screen, no phone frame */
+  #root{position:fixed;inset:0;overflow:hidden}
+  #root>div{width:100%;height:100%}
+  #side{display:none}
+  /* tablets + laptops: the app sits in a phone-width column in the middle */
+  @media (min-width:640px){
+    body{background:radial-gradient(900px 600px at 50% 0%,#1d2629,#121618 70%)}
+    #root{display:flex;align-items:center;justify-content:center;padding:24px 0;box-sizing:border-box}
+    #root>div{width:430px!important;max-width:100%;height:min(100%,932px)!important;flex:none;border-radius:32px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);transform:translateZ(0)}
+  }
+  @media (min-width:1080px){
+    #root{justify-content:flex-start;padding-left:calc(50% - 215px)}
+    #side{display:flex;position:fixed;top:50%;transform:translateY(-50%);left:calc(50% + 260px);width:280px;flex-direction:column;gap:14px;font:400 14px/1.5 -apple-system,system-ui,sans-serif;color:rgba(255,255,255,.7)}
+    #side img{width:64px;height:64px;border-radius:64px}
+    #side b{font:700 20px/1.25 -apple-system,system-ui,sans-serif;color:#fff;letter-spacing:-.01em}
+    #side a.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:100px;background:#3FB2BD;color:#0E2124;font:700 14px/1 -apple-system,system-ui,sans-serif;text-decoration:none}
+    #side a.btn:hover{background:#56c3cd;color:#0E2124}
+  }
   a{color:#2E8C95} a:hover{color:#3FB2BD}
   input,textarea,select{font-size:16px}
 </style>
-<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" integrity="sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js" integrity="sha384-1/m+A1jVWbD3yiK3/vtFvm1+LjK1WLpSoDY+Kaxppwn/yP9BVSgdHTNQVOjrzUO5" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" integrity="sha384-TnlRYaR4JYz/lpaGuaiU61PjNberSA4vjLjtF+oRC/IkohkJqnWxw5EmDSOt1vA1" crossorigin="anonymous"></script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#20262A">
-<link rel="apple-touch-icon" href="icon-192.png">
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </head>
 <body>
 <div id="root"></div>
+<div id="side">
+  <img src="apple-touch-icon.png" alt="nasan Company">
+  <b>Get the nasan Company app</b>
+  <span>Install it on your phone for the full-screen app. Android download, or add it to your iPhone home screen from Safari.</span>
+  <a class="btn" href="get.html">Get the app</a>
+</div>
 <script src="a.js"></script>
 </body>
 </html>

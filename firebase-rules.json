@@ -41,6 +41,14 @@
           ".validate": "newData.child('email').isString() && newData.child('email').val().length <= 120 && (!newData.child('first').exists() || newData.child('first').val().length <= 80) && (!newData.child('last').exists() || newData.child('last').val().length <= 80)"
         }
       },
+      "reviews": {
+        ".read": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
+        "$k": {
+          ".write": "!data.exists() && newData.exists()",
+          ".validate": "newData.child('code').isString() && newData.child('code').val().length <= 30 && newData.child('stars').isNumber() && newData.child('stars').val() >= 1 && newData.child('stars').val() <= 5 && newData.child('text').isString() && newData.child('text').val().length <= 400 && newData.child('at').isNumber() && newData.child('at').val() <= now + 60000"
+        }
+      },
       "traffic": {
         ".read": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",
         ".write": "auth != null && auth.uid === 'TBDbDUsR9ANLY8Gfmeb6D7obi5z2'",

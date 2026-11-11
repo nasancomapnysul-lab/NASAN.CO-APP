@@ -1,10 +1,40 @@
-/* nasan offline support: app files cached, always fetches fresh when online */
-const C = 'nasan-v1';
+/* nasan offline support
+   - React / Firebase / fonts (fixed versions) are kept on the phone: no download after the first open
+   - the app's own files are fetched fresh, but if the network is slow (3 s) the saved copy opens instead */
+const C = 'nasan-v2';
 const CORE = ['./', './index.html', './a.js', './nasan-logo.png', './icon-192.png', './icon-512.png', './manifest.json'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
+const LIBS = [
+  'https://unpkg.com/react@18.3.1/umd/react.production.min.js',
+  'https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js',
+  'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js',
+];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(C).then(c => Promise.all([c.addAll(CORE), ...LIBS.map(u => fetch(u, { mode: 'cors' }).then(r => r.ok && c.put(u, r)).catch(() => {}))])).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim()));
+});
+const fixed = u => (u.hostname === 'unpkg.com' && /@\d+\.\d+\.\d+\//.test(u.pathname)) || (u.hostname === 'www.gstatic.com' && /^\/firebasejs\/\d+\.\d+\.\d+\//.test(u.pathname)) || u.hostname === 'fonts.gstatic.com';
 self.addEventListener('fetch', e => {
-  const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.origin !== location.origin) return;
-  e.respondWith(fetch(e.request).then(r => { const copy = r.clone(); caches.open(C).then(c => c.put(e.request, copy)); return r; }).catch(() => caches.match(e.request).then(r => r || caches.match('./index.html'))));
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const u = new URL(req.url);
+  if (fixed(u)) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => { if (r.ok || r.type === 'opaque') { const cp = r.clone(); caches.open(C).then(c => c.put(req, cp)); } return r; })));
+    return;
+  }
+  if (u.origin !== location.origin) return;
+  e.respondWith(new Promise(resolve => {
+    let done = false;
+    const fromCache = () => caches.match(req).then(r => r || caches.match('./index.html'));
+    const t = setTimeout(() => { fromCache().then(r => { if (r && !done) { done = true; resolve(r); } }); }, 3000);
+    fetch(req).then(r => {
+      clearTimeout(t);
+      if (r.ok) { const cp = r.clone(); caches.open(C).then(c => c.put(req, cp)); }
+      if (!done) { done = true; resolve(r); }
+    }).catch(() => { clearTimeout(t); if (!done) fromCache().then(r => { done = true; resolve(r || Response.error()); }); });
+  }));
 });

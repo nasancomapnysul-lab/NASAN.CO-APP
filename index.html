@@ -24,7 +24,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#121618">
+<meta name="theme-color" content="#121011">
 <meta name="apple-mobile-web-app-title" content="nasan">
 <title>nasan Company</title>
 <link rel="icon" href="nasan-logo.png">
@@ -34,26 +34,26 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <style>
-  html,body{margin:0;height:100%;background:#121618;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#121011;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
   /* phones: the app fills the whole screen, no phone frame */
   #root{position:fixed;inset:0;overflow:hidden}
   #root>div{width:100%;height:100%}
   #side{display:none}
   /* tablets + laptops: the app sits in a phone-width column in the middle */
   @media (min-width:640px){
-    body{background:radial-gradient(900px 600px at 50% 0%,#1d2629,#121618 70%)}
+    body{background:radial-gradient(900px 600px at 50% 0%,#1d2629,#121011 70%)}
     #root{display:flex;align-items:center;justify-content:center;padding:24px 0;box-sizing:border-box}
-    #root>div{width:430px!important;max-width:100%;height:min(100%,932px)!important;flex:none;border-radius:32px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);transform:translateZ(0)}
+    #root>div{width:430px!important;height:932px!important;zoom:var(--z,1);flex:none;border-radius:32px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);transform:translateZ(0)}
   }
   @media (min-width:1080px){
-    #root{justify-content:flex-start;padding-left:calc(50% - 215px)}
-    #side{display:flex;position:fixed;top:50%;transform:translateY(-50%);left:calc(50% + 260px);width:280px;flex-direction:column;gap:14px;font:400 14px/1.5 -apple-system,system-ui,sans-serif;color:rgba(255,255,255,.7)}
+    #root{justify-content:flex-start;padding-left:calc(50% - 215px * var(--z,1))}
+    #side{display:flex;position:fixed;top:50%;transform:translateY(-50%);left:calc(50% + 215px * var(--z,1) + 45px);width:280px;flex-direction:column;gap:14px;font:400 14px/1.5 -apple-system,system-ui,sans-serif;color:rgba(255,255,255,.7)}
     #side img{width:64px;height:64px;border-radius:64px}
     #side b{font:700 20px/1.25 -apple-system,system-ui,sans-serif;color:#fff;letter-spacing:-.01em}
-    #side a.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:100px;background:#3FB2BD;color:#0E2124;font:700 14px/1 -apple-system,system-ui,sans-serif;text-decoration:none}
+    #side a.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:100px;background:#03A9B7;color:#0E2124;font:700 14px/1 -apple-system,system-ui,sans-serif;text-decoration:none}
     #side a.btn:hover{background:#56c3cd;color:#0E2124}
   }
-  a{color:#2E8C95} a:hover{color:#3FB2BD}
+  a{color:#2E8C95} a:hover{color:#03A9B7}
   input,textarea,select{font-size:16px}
   @keyframes bootP{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.94);opacity:.75}}
 </style>
@@ -68,7 +68,8 @@
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </head>
 <body>
-<div id="root"><div id="boot" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#121618"><img src="nasan-logo.png" alt="nasan Company" width="96" height="96" style="width:96px;height:96px;border-radius:96px;animation:bootP 1.4s ease-in-out infinite"><span style="font:700 15px/1 -apple-system,system-ui,sans-serif;letter-spacing:.2em;color:#46A4AC">NASAN</span></div></div>
+<script>(function(){function f(){var w=innerWidth,h=innerHeight,z=1;if(w>=640){z=Math.min((h-48)/932,(w>=1080?w-380:w-32)/430);z=Math.max(.6,Math.min(1.6,z));}document.documentElement.style.setProperty('--z',z.toFixed(3));}f();addEventListener('resize',f);})();</script>
+<div id="root"><div id="boot" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#121011"><img src="nasan-logo.png" alt="nasan Company" width="96" height="96" style="width:96px;height:96px;border-radius:96px;animation:bootP 1.4s ease-in-out infinite"><span style="font:700 15px/1 -apple-system,system-ui,sans-serif;letter-spacing:.2em;color:#03A9B7">NASAN</span></div></div>
 <div id="side">
   <img src="apple-touch-icon.png" alt="nasan Company">
   <b>Get the nasan Company app</b>

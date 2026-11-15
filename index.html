@@ -43,7 +43,7 @@
   @media (min-width:640px){
     body{background:radial-gradient(900px 600px at 50% 0%,#1d2629,#121011 70%)}
     #root{display:flex;align-items:center;justify-content:center;padding:24px 0;box-sizing:border-box}
-    #root>div{width:430px!important;height:932px!important;zoom:var(--z,1);flex:none;border-radius:32px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);transform:translateZ(0)}
+    #root>div{width:430px!important;height:var(--ch,932px)!important;zoom:var(--z,1);flex:none;border-radius:32px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);transform:translateZ(0)}
   }
   @media (min-width:1080px){
     #root{justify-content:flex-start;padding-left:calc(50% - 215px * var(--z,1))}
@@ -53,6 +53,9 @@
     #side a.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:100px;background:#03A9B7;color:#0E2124;font:700 14px/1 -apple-system,system-ui,sans-serif;text-decoration:none}
     #side a.btn:hover{background:#56c3cd;color:#0E2124}
   }
+  html.tab #root{padding:0;align-items:flex-start;justify-content:flex-start}
+  html.tab #root>div{width:var(--tw)!important;height:var(--th)!important;border-radius:0;box-shadow:none}
+  html.tab #side{display:none!important}
   a{color:#2E8C95} a:hover{color:#03A9B7}
   input,textarea,select{font-size:16px}
   @keyframes bootP{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.94);opacity:.75}}
@@ -68,7 +71,14 @@
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </head>
 <body>
-<script>(function(){function f(){var w=innerWidth,h=innerHeight,z=1;if(w>=640){z=Math.min((h-48)/932,(w>=1080?w-380:w-32)/430);z=Math.max(.6,Math.min(1.6,z));}document.documentElement.style.setProperty('--z',z.toFixed(3));}f();addEventListener('resize',f);})();</script>
+<script>(function(){var d=document.documentElement;function f(){var w=innerWidth,h=innerHeight,z=1,coarse=matchMedia('(pointer:coarse)').matches;
+/* tablets (portrait, or any touch screen under 1080 px): the app fills the whole screen, scaled up */
+var tab=w>=640&&(w<1080||(coarse&&h>=w*0.9));
+d.classList.toggle('tab',tab);
+if(tab){z=Math.max(1,Math.min(1.8,Math.min(w/430,h/700)));d.style.setProperty('--tw',(w/z).toFixed(1)+'px');d.style.setProperty('--th',(h/z).toFixed(1)+'px');}
+/* laptops: phone column filling the screen height */
+else if(w>=640){z=Math.max(1,Math.min(1.6,(h-48)/780,(w-380)/430));d.style.setProperty('--ch',((h-48)/z).toFixed(1)+'px');}
+d.style.setProperty('--z',z.toFixed(3));}f();addEventListener('resize',f);addEventListener('orientationchange',function(){setTimeout(f,120);});})();</script>
 <div id="root"><div id="boot" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#121011"><img src="nasan-logo.png" alt="nasan Company" width="96" height="96" style="width:96px;height:96px;border-radius:96px;animation:bootP 1.4s ease-in-out infinite"><span style="font:700 15px/1 -apple-system,system-ui,sans-serif;letter-spacing:.2em;color:#03A9B7">NASAN</span></div></div>
 <div id="side">
   <img src="apple-touch-icon.png" alt="nasan Company">

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<meta name="theme-color" content="#121618">
+<meta name="theme-color" content="#121011">
 <title>Get the nasan Company app</title>
 <link rel="icon" href="nasan-logo.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -36,6 +36,15 @@
 
   .tag{display:inline-block;margin-left:auto;padding:4px 9px;border-radius:100px;background:rgba(63,178,189,.16);color:#3FB2BD;font:700 10.5px/1 -apple-system,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
   .hide{display:none!important}
+  /* laptops and tablets: bigger, both ways side by side */
+  @media (min-width:860px){
+    html,body{font-size:17px}
+    .wrap{max-width:940px;padding-top:64px;gap:24px;display:grid;grid-template-columns:1fr 1fr;align-items:start}
+    .wrap>.head,.wrap>.btn,.wrap>.foot,.wrap>p{grid-column:1/-1}
+    .head img{width:120px;height:120px;border-radius:120px}
+    h1{font-size:34px}
+    .card{padding:26px;border-radius:24px;height:100%}
+  }
 </style>
 </head>
 <body>

@@ -77,8 +77,10 @@ var tab=w>=640&&(w<1080||(coarse&&h>=w*0.9));
 d.classList.toggle('tab',tab);
 if(tab){z=Math.max(1,Math.min(1.8,Math.min(w/430,h/700)));d.style.setProperty('--tw',(w/z).toFixed(1)+'px');d.style.setProperty('--th',(h/z).toFixed(1)+'px');}
 /* laptops: phone column filling the screen height */
-else if(w>=640){z=Math.max(1,Math.min(1.7,(h-40)/600,(w-380)/430));d.style.setProperty('--ch',((h-40)/z).toFixed(1)+'px');}
-d.style.setProperty('--z',z.toFixed(3));}f();addEventListener('resize',f);addEventListener('orientationchange',function(){setTimeout(f,120);});})();</script>
+else if(w>=640){z=Math.max(1,Math.min(1.45,(h-40)/640,(w-380)/430));d.style.setProperty('--ch',((h-40)/z).toFixed(1)+'px');}
+d.style.setProperty('--z',z.toFixed(3));
+/* phones keep room for the phone's own clock bar; laptops have none */
+d.style.setProperty('--sb',(w>=640&&!tab)?'14px':'52px');}f();addEventListener('resize',f);addEventListener('orientationchange',function(){setTimeout(f,120);});})();</script>
 <div id="root"><div id="boot" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#121011"><img src="nasan-logo.png" alt="nasan Company" width="96" height="96" style="width:96px;height:96px;border-radius:96px;animation:bootP 1.4s ease-in-out infinite"><span style="font:700 15px/1 -apple-system,system-ui,sans-serif;letter-spacing:.2em;color:#03A9B7">NASAN</span></div></div>
 <div id="side">
   <img src="apple-touch-icon.png" alt="nasan Company">

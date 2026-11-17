@@ -36,7 +36,7 @@
   <div id="form" hidden>
     <div class="f"><input id="p1" type="password" autocomplete="new-password" placeholder="New password" maxlength="128"><button class="eye" type="button" data-for="p1">Show</button></div>
     <div class="f"><input id="p2" type="password" autocomplete="new-password" placeholder="Type it again" maxlength="128"><button class="eye" type="button" data-for="p2">Show</button></div>
-    <ul><li id="r1">At least 12 characters</li><li id="r2">Letters and numbers</li><li id="r3">Both boxes match</li></ul>
+    <ul><li id="r1">At least 8 characters</li><li id="r2">A capital letter (A–Z)</li><li id="r4">A small letter (a–z)</li><li id="r5">A number (0–9)</li><li id="r6">A symbol, like @ # _ &amp; - *</li><li id="r3">Both boxes match</li></ul>
     <button class="go" id="go" disabled>Save new password</button>
   </div>
   <div class="msg" id="m"></div>
@@ -57,7 +57,7 @@
     var c = (e && e.code) || '';
     if (/expired/.test(c)) return 'This link has expired. Ask for a new email and use the newest one.';
     if (/invalid-action-code/.test(c)) return 'This link was already used or is not the newest one. Ask for a new email.';
-    if (/weak-password/.test(c)) return 'That password is too weak. Choose a longer one.';
+    if (/weak-password|password-does-not-meet-requirements/.test(c)) return 'That password is too weak. Use 8+ characters with a capital letter, a small letter, a number and a symbol.';
     if (/user-disabled/.test(c)) return 'This account is turned off.';
     if (/network/.test(c)) return 'No connection. Check the internet and try again.';
     if (/too-many/.test(c)) return 'Too many tries. Wait a few minutes.';
@@ -73,9 +73,9 @@
       $('form').hidden = false;
       var check = function () {
         var a = $('p1').value, b = $('p2').value;
-        var k1 = a.length >= 12, k2 = /[a-z]/i.test(a) && /\d/.test(a), k3 = a.length > 0 && a === b;
-        $('r1').className = k1 ? 'y' : ''; $('r2').className = k2 ? 'y' : ''; $('r3').className = k3 ? 'y' : '';
-        $('go').disabled = !(k1 && k2 && k3);
+        var k1 = a.length >= 8, k2 = /[A-Z]/.test(a), k4 = /[a-z]/.test(a), k5 = /\d/.test(a), k6 = /[^A-Za-z0-9\s]/.test(a), k3 = a.length > 0 && a === b;
+        $('r1').className = k1 ? 'y' : ''; $('r2').className = k2 ? 'y' : ''; $('r4').className = k4 ? 'y' : ''; $('r5').className = k5 ? 'y' : ''; $('r6').className = k6 ? 'y' : ''; $('r3').className = k3 ? 'y' : '';
+        $('go').disabled = !(k1 && k2 && k4 && k5 && k6 && k3);
       };
       $('p1').addEventListener('input', check); $('p2').addEventListener('input', check);
       $('go').addEventListener('click', function () {

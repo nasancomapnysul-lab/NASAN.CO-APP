@@ -145,6 +145,17 @@
     say('Confirming your email…');
     auth.applyActionCode(code).then(function () { say('Email confirmed', 'Thank you — your nasan Company account is ready. Go back to the app; it signs you in by itself.', 'ok'); })
       .catch(function (e) { say('This link does not work', why(e), 'bad'); });
+  } else if (mode === 'verifyAndChangeEmail') {
+    say('Confirming your new email…');
+    auth.checkActionCode(code).then(function (info) {
+      var to = (info.data && (info.data.email || info.data.newEmail)) || '';
+      return auth.applyActionCode(code).then(function () { say('Email changed', 'Your nasan Company account now uses ' + (to || 'your new email') + '. Go back to the app — it updates by itself.', 'ok'); });
+    }).catch(function (e) { say('This link does not work', why(e), 'bad'); });
+  } else if (mode === 'revertSecondFactorAddition') {
+    say('Removing the extra sign-in step…');
+    auth.checkActionCode(code).then(function () { return auth.applyActionCode(code); })
+      .then(function () { say('Extra sign-in step removed', 'If you did not add it yourself, reset your password now.', 'ok'); })
+      .catch(function (e) { say('This link does not work', why(e), 'bad'); });
   } else if (mode === 'recoverEmail') {
     auth.checkActionCode(code).then(function (info) { return auth.applyActionCode(code).then(function () { say('Email changed back', 'Your account email is ' + ((info.data && info.data.email) || 'restored') + ' again. Change your password to be safe.', 'ok'); }); })
       .catch(function (e) { say('This link does not work', why(e), 'bad'); });

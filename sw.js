@@ -1,13 +1,11 @@
-/* nasan offline support
-   - React / Firebase / fonts (fixed versions) are kept on the phone: no download after the first open
-   - the app's own files are fetched fresh, but if the network is slow (3 s) the saved copy opens instead */
-const C = 'nasan-v3';
-/* on any old address (github.io): remove this offline copy so the old address stops opening the app */
-if (self.location.hostname !== 'app.nasan.company' && self.location.hostname !== 'localhost') {
-  self.addEventListener('install', () => self.skipWaiting());
-  self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.map(x => caches.delete(x)))).then(() => self.registration.unregister()).then(() => self.clients.matchAll()).then(cs => cs.forEach(c => c.navigate('https://app.nasan.company/')))); });
-}
-const CORE = ['./', './index.html', './a.js', './nasan-logo.png', './icon-192.png', './icon-512.png', './manifest.json'];
+/* nasan offline support v4
+   - React / Firebase / fonts (fixed versions) stay on the phone after the first open
+   - a.js?v=NN stays on the phone: a new number in index.html downloads the new one once
+   - the start page comes fresh from the internet, or the saved copy if the internet is slow (1.2 s)
+   - pictures open from the phone at once and refresh in the background
+   - only runs on app.nasan.company; anywhere else it removes itself */
+const C = 'nasan-v4';
+const HOST = 'app.nasan.company';
 const LIBS = [
   'https://unpkg.com/react@18.3.1/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js',
@@ -16,29 +14,46 @@ const LIBS = [
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js',
 ];
-if (self.location.hostname === 'app.nasan.company' || self.location.hostname === 'localhost') self.addEventListener('install', e => {
-  e.waitUntil(caches.open(C).then(c => Promise.all([c.addAll(CORE), ...LIBS.map(u => fetch(u, { mode: 'cors' }).then(r => r.ok && c.put(u, r)).catch(() => {}))])).then(() => self.skipWaiting()));
+self.addEventListener('install', e => {
+  if (location.hostname !== HOST) { self.skipWaiting(); return; }
+  e.waitUntil(caches.open(C).then(c => Promise.all([
+    c.addAll(['./', './nasan-logo.png', './manifest.json']).catch(() => {}),
+    ...LIBS.map(u => fetch(u, { mode: 'cors' }).then(r => r.ok && c.put(u, r)).catch(() => {})),
+  ])).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => {
+    if (location.hostname !== HOST) return Promise.all(ks.map(k => caches.delete(k))).then(() => self.registration.unregister());
+    return Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k))).then(() => self.clients.claim());
+  }));
 });
 const fixed = u => (u.hostname === 'unpkg.com' && /@\d+\.\d+\.\d+\//.test(u.pathname)) || (u.hostname === 'www.gstatic.com' && /^\/firebasejs\/\d+\.\d+\.\d+\//.test(u.pathname)) || u.hostname === 'fonts.gstatic.com';
-if (self.location.hostname === 'app.nasan.company' || self.location.hostname === 'localhost') self.addEventListener('fetch', e => {
+const keep = (key, r) => { if (r && (r.ok || r.type === 'opaque')) { const cp = r.clone(); caches.open(C).then(c => c.put(key, cp)).catch(() => {}); } return r; };
+self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET') return;
+  if (req.method !== 'GET' || location.hostname !== HOST) return;
   const u = new URL(req.url);
-  if (fixed(u)) {
-    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => { if (r.ok || r.type === 'opaque') { const cp = r.clone(); caches.open(C).then(c => c.put(req, cp)); } return r; })));
+  if (fixed(u)) { e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => keep(req, r)))); return; }
+  if (u.origin !== location.origin) return;
+  if (/\/a\.js$/.test(u.pathname) && u.searchParams.has('v')) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
+      if (r.ok) caches.open(C).then(c => c.keys().then(ks => ks.forEach(k => { if (/\/a\.js(\?|$)/.test(k.url) && k.url !== req.url) c.delete(k); }))).catch(() => {});
+      return keep(req, r);
+    })));
     return;
   }
-  if (u.origin !== location.origin) return;
+  if (/\.(png|jpe?g|webp|gif|svg|ico)$/i.test(u.pathname)) {
+    e.respondWith(caches.match(req).then(hit => { const net = fetch(req).then(r => keep(req, r)).catch(() => hit); return hit || net; }));
+    return;
+  }
+  const page = req.mode === 'navigate';
   e.respondWith(new Promise(resolve => {
     let done = false;
-    const fromCache = () => caches.match(req).then(r => r || caches.match('./index.html'));
-    const t = setTimeout(() => { fromCache().then(r => { if (r && !done) { done = true; resolve(r); } }); }, 3000);
-    fetch(req).then(r => {
+    const fromCache = () => caches.match(req, { ignoreSearch: page }).then(r => r || (page ? caches.match('./') : undefined));
+    const t = setTimeout(() => { fromCache().then(r => { if (r && !done) { done = true; resolve(r); } }); }, page ? 1200 : 3000);
+    fetch(page ? new Request(u.href, { cache: 'no-cache', redirect: 'manual', credentials: 'same-origin' }) : req).then(r => {
       clearTimeout(t);
-      if (r.ok) { const cp = r.clone(); caches.open(C).then(c => c.put(req, cp)); }
+      if (r.ok) keep(page ? u.origin + u.pathname : req, r);
       if (!done) { done = true; resolve(r); }
     }).catch(() => { clearTimeout(t); if (!done) fromCache().then(r => { done = true; resolve(r || Response.error()); }); });
   }));
